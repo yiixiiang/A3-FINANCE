@@ -1,0 +1,10 @@
+A3 FINANCE V1.3.2 SQL VALIDATION REPORT
+===========================================
+
+PASS - Complete installer contains migrations 020, 021, 023 and 024.
+PASS - 4 BEGIN transactions and 4 COMMIT statements detected.
+PASS - No executable ON CONFLICT statement remains in the complete installer.
+PASS - Parentheses and PostgreSQL dollar-quote delimiters are balanced.
+PASS - Final readiness query checks all required driver signup objects.
+
+Purpose: fixes PostgreSQL ERROR 21000 caused by duplicate constrained values in one upsert command.

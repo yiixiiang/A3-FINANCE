@@ -1,0 +1,260 @@
+.page {
+  min-height: 100vh;
+  padding: 20px;
+  background: #e9eef5;
+  color: #111827;
+}
+
+.loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #eef2f7;
+  color: #475569;
+  font-weight: 800;
+}
+
+.toolbar {
+  width: min(100%, 1500px);
+  margin: 0 auto 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.toolbar a,
+.toolbar button {
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  padding: 10px 14px;
+  background: #fff;
+  color: #1d4ed8;
+  font: inherit;
+  font-weight: 850;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.report {
+  width: min(100%, 1500px);
+  margin: 0 auto;
+  padding: 24px;
+  background: #fff;
+  box-shadow: 0 22px 55px rgba(15, 23, 42, 0.13);
+}
+
+.header {
+  border-bottom: 3px solid #0f766e;
+  padding-bottom: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.companyBlock {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.companyBlock img {
+  width: 80px;
+  max-height: 72px;
+  object-fit: contain;
+}
+
+.companyBlock h1,
+.companyBlock p,
+.documentBlock h2,
+.documentBlock p,
+.auditSection h3,
+.group h4,
+.footer p {
+  margin: 0;
+}
+
+.companyBlock h1 {
+  font-size: 1.45rem;
+}
+
+.companyBlock p {
+  margin-top: 5px;
+  color: #475569;
+  font-size: 0.82rem;
+}
+
+.documentBlock {
+  min-width: 340px;
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+  text-align: right;
+}
+
+.documentBlock p {
+  color: #0f766e;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.documentBlock h2 {
+  font-size: 1.55rem;
+}
+
+.documentBlock span {
+  color: #64748b;
+}
+
+.documentBlock em {
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.metaGrid,
+.summaryGrid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metaGrid > div,
+.summaryGrid > div {
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  padding: 11px;
+  display: grid;
+  gap: 5px;
+}
+
+.metaGrid span,
+.summaryGrid span,
+.summaryGrid small,
+.footer span {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.summaryGrid > div {
+  min-height: 90px;
+  background: #f8fafc;
+}
+
+.summaryGrid strong {
+  font-size: 1.02rem;
+}
+
+.summaryGrid .net {
+  border-color: #99f6e4;
+  background: #ecfdf5;
+}
+
+.auditSection {
+  margin-top: 18px;
+}
+
+.sectionHeading {
+  margin-bottom: 9px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.sectionHeading span {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.group {
+  margin-top: 12px;
+  break-inside: avoid;
+}
+
+.group h4 {
+  border-left: 4px solid #0f766e;
+  padding: 5px 8px;
+  background: #f0fdfa;
+  font-size: 0.82rem;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+.table th,
+.table td {
+  border: 1px solid #dbe3ee;
+  padding: 6px 7px;
+  text-align: left;
+}
+
+.table th {
+  background: #0f172a;
+  color: #fff;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+}
+
+.table th:nth-child(n + 6),
+.table td:nth-child(n + 6) {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.footer {
+  margin-top: 22px;
+  border-top: 1px solid #cbd5e1;
+  padding-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.footer > div {
+  display: grid;
+  gap: 22px;
+}
+
+.footer p {
+  grid-column: 1 / -1;
+  color: #64748b;
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.empty {
+  padding: 30px;
+  color: #64748b;
+  text-align: center;
+}
+
+@page {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+@media print {
+  .page {
+    padding: 0;
+    background: #fff;
+  }
+
+  .toolbar {
+    display: none;
+  }
+
+  .report {
+    width: 100%;
+    padding: 0;
+    box-shadow: none;
+  }
+}

@@ -58,13 +58,15 @@ const driverLoginRepairSql = fs.readFileSync(
   "utf8",
 );
 if (
-  !driverLoginRepairSql.includes("lower(btrim(driver.login_email)) = lower(btrim(auth_user.email))") ||
+  !driverLoginRepairSql.includes("lower(btrim(driver.login_email)) as email_key") ||
+  !driverLoginRepairSql.includes("auth_user.email_key = driver.email_key") ||
   !driverLoginRepairSql.includes("login_enabled = true") ||
-  !driverLoginRepairSql.includes("coalesce(profile.role, 'user') in ('user', 'driver')")
+  !driverLoginRepairSql.includes("coalesce(profile.role, 'user') in ('user', 'driver')") ||
+  !driverLoginRepairSql.includes("group by driver.auth_user_id, driver.company_id")
 ) {
-  fail("Migration 023 does not safely repair exact-email driver login links.");
+  fail("Migration 023 does not safely repair and deduplicate exact-email driver login links.");
 } else {
-  pass("Driver login link repair is installed with exact-email and role safeguards.");
+  pass("Driver login repair uses exact-email, role and duplicate-upsert safeguards.");
 }
 
 const compatibilityMigration = path.join(

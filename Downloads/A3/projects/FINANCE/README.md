@@ -105,3 +105,9 @@ npm run typecheck  # Run strict TypeScript checking
 npm run verify     # Validate required files, migrations and project safeguards
 npm run clean      # Remove generated build caches and obsolete migration leftovers
 ```
+
+## Driver login repair
+
+If an older database shows `Driver profile is not linked to this login`, run
+`supabase/migrations/023_repair_driver_login_links.sql` in Supabase SQL Editor.
+The V2 repair deduplicates company-access upserts and can be run repeatedly.

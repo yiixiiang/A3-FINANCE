@@ -1,0 +1,4 @@
+VERCEL PROJECT: a3group-homepage
+PRIMARY DOMAIN: a3group.sg
+REDIRECT DOMAIN: www.a3group.sg -> a3group.sg
+BUSINESS SUBDOMAINS: sakura.a3group.sg, limousine.a3group.sg, food.a3group.sg

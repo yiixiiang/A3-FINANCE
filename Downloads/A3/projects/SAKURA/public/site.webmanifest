@@ -1,0 +1,17 @@
+{
+  "name": "Sakura Entertainment",
+  "short_name": "Sakura",
+  "description": "Sakura Entertainment table bookings, events and promotions.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070307",
+  "theme_color": "#070307",
+  "icons": [
+    {
+      "src": "/sakura-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

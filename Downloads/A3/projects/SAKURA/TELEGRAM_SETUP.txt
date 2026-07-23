@@ -1,0 +1,31 @@
+SAKURA ENTERTAINMENT — TELEGRAM BOT SETUP
+
+1. In Telegram, open @BotFather and send /newbot.
+2. Copy the bot username and token.
+3. Add these environment variables in Vercel:
+
+NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=YourBotUsername
+TELEGRAM_BOT_TOKEN=YourBotFatherToken
+TELEGRAM_WEBHOOK_SECRET=CreateAtLeast16LettersNumbers_Underscore-Hyphen
+NEXT_PUBLIC_SITE_URL=https://sakura.a3group.sg
+
+4. Deploy the website.
+5. Put the same values in .env.local on your computer.
+6. Run: npm run telegram:setup
+7. Open your bot, tap Start, and send /chatid.
+8. Add the returned number in Vercel:
+
+TELEGRAM_ADMIN_CHAT_ID=YourChatID
+
+9. Redeploy.
+
+The bot supports:
+/start
+/book
+/promotions
+/hours
+/contact
+/chatid
+
+Website table bookings are delivered to TELEGRAM_ADMIN_CHAT_ID.
+Never share TELEGRAM_BOT_TOKEN publicly.

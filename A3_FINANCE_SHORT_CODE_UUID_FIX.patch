@@ -1,0 +1,29 @@
+diff --git a/src/app/api/public/driver-signup/[token]/route.ts b/src/app/api/public/driver-signup/[token]/route.ts
+index 3bfabe1..afec2ce 100644
+--- a/src/app/api/public/driver-signup/[token]/route.ts
++++ b/src/app/api/public/driver-signup/[token]/route.ts
+@@ -128,13 +128,20 @@ async function loadSignupLink(accessKey: string) {
+     return { admin, link: null as SignupLinkRecord | null };
+   }
+ 
+-  const { data, error } = await admin
++  const query = admin
+     .from("driver_signup_links")
+     .select(
+       "id,company_id,public_token,short_code,link_name,status,expires_at,max_applications,application_count,companies(id,name,company_type,status,address,phone,email,logo_path,primary_colour,secondary_colour,accent_colour)",
+-    )
+-    .or(`public_token.eq.${key},short_code.ilike.${key}`)
+-    .maybeSingle();
++    );
++
++  const isUuid =
++    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
++      key,
++    );
++
++  const { data, error } = isUuid
++    ? await query.eq("public_token", key).maybeSingle()
++    : await query.eq("short_code", key.toUpperCase()).maybeSingle();
+ 
+   if (error) throw new Error(error.message);
+   return { admin, link: data as SignupLinkRecord | null };

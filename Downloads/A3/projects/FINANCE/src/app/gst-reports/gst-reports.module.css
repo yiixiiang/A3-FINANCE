@@ -1,0 +1,650 @@
+.page {
+  min-height: 100vh;
+  padding: 24px;
+  background: #f4f7fb;
+  color: #172033;
+}
+
+.loading {
+  min-height: 80vh;
+  display: grid;
+  place-items: center;
+  background: #f4f7fb;
+  color: #475569;
+  font-weight: 800;
+}
+
+.hero {
+  max-width: 1500px;
+  margin: 0 auto 18px;
+  border-radius: 20px;
+  padding: 24px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  background: linear-gradient(135deg, #0f172a, #173b6b 58%, #0f766e);
+  color: #fff;
+  box-shadow: 0 22px 55px rgba(15, 23, 42, 0.16);
+}
+
+.hero h1,
+.hero p,
+.panelHeading h2,
+.panelHeading p,
+.periodHeader h2,
+.periodHeader p,
+.editorPanel h3,
+.formStack h3 {
+  margin: 0;
+}
+
+.hero h1 {
+  margin-top: 5px;
+  font-size: clamp(1.8rem, 3vw, 2.7rem);
+}
+
+.hero > div > p:not(.eyebrow) {
+  max-width: 720px;
+  margin-top: 9px;
+  color: #d7e4f3;
+}
+
+.eyebrow,
+.panelHeading p,
+.periodHeader p {
+  color: #67e8f9;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.heroActions {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.heroActions label,
+.formStack label,
+.settingsGrid label,
+.editorPanel label {
+  display: grid;
+  gap: 6px;
+}
+
+.heroActions label span,
+.formStack label span,
+.settingsGrid label > span,
+.editorPanel label span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+}
+
+.heroActions label span {
+  color: #bfdbfe;
+}
+
+.heroActions select,
+.heroActions input,
+.formStack input,
+.formStack select,
+.formStack textarea,
+.settingsGrid input,
+.settingsGrid select,
+.editorPanel input,
+.editorPanel select,
+.editorPanel textarea,
+.panelHeading select {
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 9px 11px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+}
+
+.formStack textarea,
+.editorPanel textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.printButton,
+.primaryButton,
+.actionRow button,
+.smallButton,
+.periodHeader button,
+.tabs button {
+  border: 0;
+  border-radius: 10px;
+  padding: 11px 15px;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.printButton {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  background: #fff;
+  color: #0f4c5c;
+  text-decoration: none;
+}
+
+.primaryButton {
+  background: #1d4ed8 !important;
+  color: #fff !important;
+}
+
+.warningButton {
+  background: #fff7ed !important;
+  color: #c2410c !important;
+}
+
+.success,
+.error {
+  max-width: 1500px;
+  margin: 0 auto 14px;
+  border-radius: 12px;
+  padding: 13px 16px;
+  font-weight: 800;
+}
+
+.success {
+  border: 1px solid #86efac;
+  background: #ecfdf5;
+  color: #166534;
+}
+
+.error {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.tabs {
+  max-width: 1500px;
+  margin: 0 auto 16px;
+  border: 1px solid #dbe3ee;
+  border-radius: 14px;
+  padding: 6px;
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  background: #fff;
+}
+
+.tabs button {
+  flex: 1 0 auto;
+  background: transparent;
+  color: #64748b;
+}
+
+.tabs .activeTab {
+  background: #e8f0ff;
+  color: #1d4ed8;
+}
+
+.workspace,
+.reviewLayout {
+  max-width: 1500px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.sidePanel,
+.mainPanel,
+.cardPanel,
+.settingsPanel,
+.editorPanel,
+.auditPanel {
+  border: 1px solid #dbe3ee;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.05);
+}
+
+.sidePanel {
+  position: sticky;
+  top: 16px;
+  overflow: hidden;
+}
+
+.mainPanel,
+.cardPanel,
+.settingsPanel {
+  max-width: 1500px;
+  padding: 20px;
+}
+
+.cardPanel,
+.settingsPanel {
+  margin: 0 auto;
+}
+
+.editorPanel {
+  padding: 18px;
+  position: sticky;
+  top: 16px;
+}
+
+.panelHeading {
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #e5eaf1;
+}
+
+.mainPanel > .panelHeading,
+.cardPanel > .panelHeading,
+.settingsPanel > .panelHeading,
+.auditPanel > .panelHeading {
+  margin: -20px -20px 18px;
+}
+
+.panelHeading p {
+  margin-bottom: 4px;
+  color: #2563eb;
+}
+
+.panelHeading h2 {
+  font-size: 1.2rem;
+}
+
+.panelHeading > span {
+  min-width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #e8f0ff;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.periodList {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 10px;
+  display: grid;
+  gap: 7px;
+}
+
+.periodList button {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 5px;
+  background: transparent;
+  color: #334155;
+  text-align: left;
+  cursor: pointer;
+}
+
+.periodList button:hover,
+.periodList .selectedCard {
+  border-color: #b7cdfd;
+  background: #edf3ff;
+}
+
+.periodList small,
+.dataTable small,
+.snapshotNote,
+.settingsGrid small,
+.codeGrid small {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.formStack {
+  border-top: 1px solid #e5eaf1;
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.twoColumns,
+.settingsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.checkbox {
+  display: flex !important;
+  align-items: center;
+  gap: 9px;
+}
+
+.checkbox input {
+  width: 18px;
+  min-height: 18px;
+}
+
+.actionRow,
+.tableActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.actionRow button,
+.periodHeader button,
+.smallButton {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+}
+
+.periodHeader {
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.periodHeader p {
+  color: #0f766e;
+}
+
+.periodHeader h2 {
+  margin: 4px 0 6px;
+}
+
+.periodHeader span {
+  color: #64748b;
+}
+
+.boxGrid {
+  margin: 18px 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.boxGrid article {
+  min-height: 130px;
+  border: 1px solid #dbe3ee;
+  border-radius: 14px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 9px;
+  background: #f8fafc;
+}
+
+.boxGrid article > span {
+  color: #2563eb;
+  font-weight: 900;
+}
+
+.boxGrid article small {
+  color: #64748b;
+}
+
+.boxGrid article strong {
+  font-size: 1.18rem;
+}
+
+.boxGrid .netBox {
+  border-color: #99f6e4;
+  background: #ecfdf5;
+}
+
+.auditPanel {
+  margin-top: 16px;
+  padding: 20px;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.dataTable {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+}
+
+.dataTable th,
+.dataTable td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 11px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.dataTable th {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dataTable td strong,
+.dataTable td small {
+  display: block;
+}
+
+.numberCell {
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.status {
+  width: max-content;
+  border-radius: 999px;
+  padding: 4px 8px;
+  display: inline-block;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.draft,
+.pending {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.reviewed,
+.posted {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.filed,
+.matched {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.excluded,
+.void {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.reviewLayout {
+  max-width: none;
+  grid-template-columns: minmax(0, 1fr) 330px;
+}
+
+.reviewLayout > .tableWrap {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.editorPanel .formStack {
+  border-top: 0;
+  padding: 14px 0 0;
+}
+
+.codeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.codeGrid button {
+  min-height: 165px;
+  border: 1px solid #dbe3ee;
+  border-radius: 14px;
+  padding: 15px;
+  display: grid;
+  gap: 10px;
+  background: #fff;
+  color: #172033;
+  text-align: left;
+  cursor: pointer;
+}
+
+.codeGrid button:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 10px 25px rgba(37, 99, 235, 0.08);
+}
+
+.codeGrid button > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.codeGrid button p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.codeGrid button footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.codeGrid button em {
+  border-radius: 999px;
+  padding: 4px 7px;
+  background: #e8f0ff;
+  color: #1d4ed8;
+  font-size: 0.65rem;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.codeGrid .inactiveCard {
+  opacity: 0.58;
+}
+
+.settingsPanel {
+  max-width: 980px;
+}
+
+.settingsGrid {
+  margin-bottom: 18px;
+}
+
+.settingsGrid label {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 13px;
+  background: #f8fafc;
+}
+
+.dangerText {
+  color: #b91c1c !important;
+}
+
+.empty,
+.largeEmpty {
+  color: #64748b;
+  text-align: center;
+}
+
+.largeEmpty {
+  min-height: 420px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+}
+
+.snapshotNote {
+  margin: 12px 0 0;
+  text-align: right;
+}
+
+.page button:disabled,
+.page input:disabled,
+.page select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 1100px) {
+  .workspace,
+  .reviewLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidePanel,
+  .editorPanel {
+    position: static;
+  }
+
+  .boxGrid,
+  .codeGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .page {
+    padding: 14px 12px 92px;
+  }
+
+  .hero,
+  .periodHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .heroActions,
+  .actionRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .twoColumns,
+  .settingsGrid,
+  .boxGrid,
+  .codeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .mainPanel,
+  .cardPanel,
+  .settingsPanel {
+    padding: 15px;
+  }
+}

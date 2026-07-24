@@ -18,13 +18,16 @@ export async function login(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(error?.message ?? "Unable to sign in.")}`);
   }
 
-  await supabase.rpc("bootstrap_first_admin");
-
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("status, role")
     .eq("id", signInResult.user.id)
     .maybeSingle();
+
+  if (profileError) {
+    await supabase.auth.signOut();
+    redirect(`/login?error=${encodeURIComponent("Unable to load your account profile.")}`);
+  }
 
   if (profile?.status === "inactive") {
     await supabase.auth.signOut();

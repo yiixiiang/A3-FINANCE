@@ -46,6 +46,7 @@ const groups: Array<{ title: string; items: NavItem[] }> = [
       { href: "/companies", label: "Companies", icon: "▦" },
       { href: "/users", label: "Users", icon: "♙" },
       { href: "/financial-control", label: "Financial Control", icon: "✓" },
+      { href: "/setup-guide", label: "Setup & User Guide", icon: "?" },
     ],
   },
 ];
@@ -135,11 +136,13 @@ export default function EnterpriseShell({ children }: { children: React.ReactNod
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-help-icon">?</div>
-          <div>
-            <strong>Need help?</strong>
-            <small>System support</small>
-          </div>
+          <Link href="/setup-guide" style={{ display: "contents" }}>
+            <div className="sidebar-help-icon">?</div>
+            <div>
+              <strong>Need help?</strong>
+              <small>Open setup guide</small>
+            </div>
+          </Link>
         </div>
       </aside>
 

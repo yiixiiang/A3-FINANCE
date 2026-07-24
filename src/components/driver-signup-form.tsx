@@ -104,6 +104,8 @@ export default function DriverSignupForm({ accessKey }: { accessKey: string }) {
   const token = accessKey;
   const [signup, setSignup] = useState<Signup | null>(null);
   const [form, setForm] = useState<Form>(emptyForm);
+  const [frontViewFile, setFrontViewFile] = useState<File | null>(null);
+  const [phvDecalFile, setPhvDecalFile] = useState<File | null>(null);
   const [vehicleFiles, setVehicleFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -154,14 +156,22 @@ export default function DriverSignupForm({ accessKey }: { accessKey: string }) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  function validateSingleImage(file: File | undefined, label: string): File | null {
+    if (!file) return null;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) { setError(`${label} must be JPG, PNG or WEBP.`); return null; }
+    if (file.size > maxFileSize) { setError(`${label} must be 10 MB or smaller.`); return null; }
+    setError("");
+    return file;
+  }
+
   function selectVehicleFiles(fileList: FileList | null) {
     if (!fileList) return;
     setError("");
 
     const nextFiles = Array.from(fileList);
     if (nextFiles.length === 0) return;
-    if (vehicleFiles.length + nextFiles.length > maxFiles) {
-      setError(`Upload no more than ${maxFiles} vehicle files.`);
+    if (vehicleFiles.length + nextFiles.length > maxFiles - 2) {
+      setError(`Upload no more than ${maxFiles - 2} additional vehicle files.`);
       return;
     }
 
@@ -203,10 +213,13 @@ export default function DriverSignupForm({ accessKey }: { accessKey: string }) {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) return;
-    if (vehicleFiles.length === 0) {
-      setError("Upload at least one vehicle document or vehicle photo.");
-      return;
-    }
+    if (!frontViewFile) { setError("Upload the required Vehicle Straight Front View photo."); return; }
+    if (!phvDecalFile) { setError("Upload the required Vehicle PHV Decal / Company Branding photo."); return; }
+    const allVehicleFiles = [
+      new File([frontViewFile], `FRONT_VIEW_${frontViewFile.name}`, { type: frontViewFile.type, lastModified: frontViewFile.lastModified }),
+      new File([phvDecalFile], `PHV_DECAL_${phvDecalFile.name}`, { type: phvDecalFile.type, lastModified: phvDecalFile.lastModified }),
+      ...vehicleFiles,
+    ];
 
     setSubmitting(true);
     setUploadProgress("Preparing secure vehicle upload...");
@@ -220,7 +233,7 @@ export default function DriverSignupForm({ accessKey }: { accessKey: string }) {
         body: JSON.stringify({
           action: "start_application",
           ...form,
-          files: vehicleFiles.map((file) => ({
+          files: allVehicleFiles.map((file) => ({
             name: file.name,
             type: file.type,
             size: file.size,
@@ -237,7 +250,7 @@ export default function DriverSignupForm({ accessKey }: { accessKey: string }) {
         !startPayload.application_id ||
         !startPayload.submission_token ||
         !Array.isArray(startPayload.uploads) ||
-        startPayload.uploads.length !== vehicleFiles.length
+        startPayload.uploads.length !== allVehicleFiles.length
       ) {
         throw new Error("The secure vehicle upload response was incomplete.");
       }
@@ -247,7 +260,7 @@ export default function DriverSignupForm({ accessKey }: { accessKey: string }) {
       for (let index = 0; index < vehicleFiles.length; index += 1) {
         const file = vehicleFiles[index];
         const upload = session.uploads[index];
-        setUploadProgress(`Uploading vehicle file ${index + 1} of ${vehicleFiles.length}: ${file.name}`);
+        setUploadProgress(`Uploading vehicle file ${index + 1} of ${allVehicleFiles.length}: ${file.name}`);
         const { error: uploadError } = await supabase.storage
           .from("driver-documents")
           .uploadToSignedUrl(upload.path, upload.token, file, {
@@ -305,7 +318,7 @@ export default function DriverSignupForm({ accessKey }: { accessKey: string }) {
           <div className={styles.successIcon}>✓</div>
           <p className={styles.kicker}>APPLICATION & VEHICLE FILES RECEIVED</p>
           <h1>Thank you, {form.full_name}.</h1>
-          <p>Your driver application and {vehicleFiles.length} vehicle file{vehicleFiles.length === 1 ? "" : "s"} were submitted directly to <strong>{signup.company.name}</strong>.</p>
+          <p>Your driver application and {2 + vehicleFiles.length} vehicle files were submitted directly to <strong>{signup.company.name}</strong>.</p>
           <div className={styles.referenceBox}><span>Application reference</span><strong>{applicationNo}</strong></div>
           <p className={styles.smallText}>The company will review your contact, vehicle, emergency, bank, PayNow and uploaded document information. Once approved, your driver login account is created automatically.</p>
         </section>
@@ -366,7 +379,22 @@ export default function DriverSignupForm({ accessKey }: { accessKey: string }) {
 
 
           <section className={styles.formSection}>
-            <div className={styles.sectionTitle}><span>03</span><div><h2>Upload Vehicle Files *</h2><p>Upload log card, insurance, inspection report or clear vehicle photos.</p></div></div>
+            <div className={styles.sectionTitle}><span>03</span><div><h2>Upload Vehicle Files *</h2><p>Both required vehicle photos must be uploaded before submission.</p></div></div>
+            <div className={styles.requiredUploadGrid}>
+              <article className={styles.requiredUploadCard}>
+                <div className={styles.frontExample}><div className={styles.carShape}>🚘</div><strong>✓ Straight Front View</strong><small>Full vehicle and plate visible</small></div>
+                <h3>Vehicle Straight Front View *</h3>
+                <ul><li>Entire vehicle must be visible</li><li>Vehicle plate number must be clear</li><li>Photo must be straight, not side angle</li><li>No blurred or cropped photo</li></ul>
+                <label className={styles.uploadDrop}><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = validateSingleImage(event.target.files?.[0], "Vehicle Straight Front View"); if (file) setFrontViewFile(file); event.target.value = ""; }} /><span className={styles.uploadIcon}>↑</span><strong>{frontViewFile ? frontViewFile.name : "Choose Front View Photo"}</strong><small>JPG, PNG or WEBP · Maximum 10 MB</small></label>
+              </article>
+              <article className={styles.requiredUploadCard}>
+                <img className={styles.decalExample} src="/examples/phv-decal-example.jpg" alt="Example Singapore PHV decal" />
+                <h3>Vehicle PHV Decal / Company Branding *</h3>
+                <ul><li>PHV decal must be clearly visible</li><li>Vehicle plate number should be visible where possible</li><li>Entire decal must be readable</li><li>Do not upload a blurred, cropped or decal-only close-up</li></ul>
+                <label className={styles.uploadDrop}><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = validateSingleImage(event.target.files?.[0], "Vehicle PHV Decal / Company Branding"); if (file) setPhvDecalFile(file); event.target.value = ""; }} /><span className={styles.uploadIcon}>↑</span><strong>{phvDecalFile ? phvDecalFile.name : "Choose PHV Decal Photo"}</strong><small>JPG, PNG or WEBP · Maximum 10 MB</small></label>
+              </article>
+            </div>
+            <h3 className={styles.additionalHeading}>Additional Vehicle Documents</h3>
             <label className={styles.uploadDrop}>
               <input
                 type="file"
@@ -378,8 +406,8 @@ export default function DriverSignupForm({ accessKey }: { accessKey: string }) {
                 }}
               />
               <span className={styles.uploadIcon}>↑</span>
-              <strong>Choose Vehicle Files</strong>
-              <small>PNG, JPG, WEBP or PDF · Maximum 10 MB each · Up to {maxFiles} files</small>
+              <strong>Choose Additional Files</strong>
+              <small>Log card, insurance, inspection report or extra photos · Up to {maxFiles - 2} files</small>
             </label>
             {vehicleFiles.length > 0 ? (
               <div className={styles.fileList}>
@@ -391,7 +419,7 @@ export default function DriverSignupForm({ accessKey }: { accessKey: string }) {
                   </div>
                 ))}
               </div>
-            ) : <p className={styles.uploadRequired}>At least one vehicle document or photo is required.</p>}
+            ) : <p className={styles.uploadRequired}>Additional documents are optional.</p>}
           </section>
 
           <section className={styles.formSection}>

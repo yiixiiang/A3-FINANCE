@@ -1,3 +1,5 @@
+import { queueCloudWrite } from "@/lib/supabase-cloud";
+
 type IdleCallback = (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void;
 type BrowserWindow = Window & {
   requestIdleCallback?: (callback: IdleCallback, options?: { timeout: number }) => number;
@@ -14,9 +16,10 @@ function notifyStorageUpdated(key: string): void {
   window.dispatchEvent(new CustomEvent(STORAGE_UPDATED_EVENT, { detail: { key } }));
 }
 
-function writeEntry(key: string, value: unknown): void {
+function writeEntry(key: string, value: unknown, immediateCloud = false): void {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
+    queueCloudWrite(key, value, immediateCloud);
   } catch {
     // Storage can be unavailable or full. Keep the UI responsive and allow
     // the caller to continue; a future server-backed store can surface errors.
@@ -75,6 +78,6 @@ export function save(key: string, value: unknown): void {
 export function saveNow(key: string, value: unknown): void {
   if (typeof window === "undefined") return;
   pendingWrites.delete(key);
-  writeEntry(key, value);
+  writeEntry(key, value, true);
   notifyStorageUpdated(key);
 }

@@ -6,6 +6,7 @@ import { bookings } from "@/lib/data";
 import { load, saveNow, STORAGE_UPDATED_EVENT } from "@/lib/browser-storage";
 import { DRIVER_STORAGE_KEY, EXPENSE_STORAGE_KEY, INCOME_STORAGE_KEY, INVOICE_STORAGE_KEY, QUOTATION_STORAGE_KEY, calculateDocumentTotals, defaultDocumentRecords, defaultDriverOverviewRecords, defaultExpenseOverviewRecords, defaultIncomeOverviewRecords, normalizeDocumentRecords, type StoredDriverRecord, type StoredExpenseRecord, type StoredIncomeRecord } from "@/lib/finance-records";
 import { DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_USER, LOGIN_SESSION_KEY, USER_ACCESS_STORAGE_KEY, USER_ACCESS_UPDATED_EVENT, normalizeUserRecords, roleLabel, visibleModuleIdsForUser, type UserAccessRecord } from "@/lib/access-control";
+import { signInAndHydrateCloud, signOutCloud } from "@/lib/supabase-cloud";
 
 type Item={id:string;label:string;icon:any};
 const nav: {label:string;items:Item[]}[]=[
@@ -60,7 +61,7 @@ export function ManagementApp(){
  useEffect(()=>{if(signedInUserId&&!allowedIds.has(active))startTransition(()=>setActive(firstAllowedId))},[active,allowedIds,firstAllowedId,signedInUserId]);
  useEffect(()=>{const closeOnEscape=(event:KeyboardEvent)=>{if(event.key==="Escape")setMobile(false)};window.addEventListener("keydown",closeOnEscape);return()=>window.removeEventListener("keydown",closeOnEscape)},[]);
  const selectPage=(id:string)=>{if(!allowedIds.has(id))return;startTransition(()=>setActive(id));setMobile(false)};
- const signIn=(identifier:string,password:string)=>{
+ const signIn=async(identifier:string,password:string)=>{
   const lookup=identifier.trim().toLowerCase();
   let user=users.find(item=>(item.username.toLowerCase()===lookup||item.email.toLowerCase()===lookup)&&item.password===password);
 
@@ -88,12 +89,18 @@ export function ManagementApp(){
 
   if(!user)return "Incorrect username/email or password.";
   if(user.status!=="Active")return "This user account is suspended.";
-  window.sessionStorage.setItem(LOGIN_SESSION_KEY,user.id);
-  setSignedInUserId(user.id);
-  setActive(visibleModuleIdsForUser(user).has("overview")?"overview":"");
+  const cloudResult=await signInAndHydrateCloud(user.email,password);
+  if(!cloudResult.ok)return cloudResult.message;
+
+  const hydratedUsers=normalizeUserRecords(load(USER_ACCESS_STORAGE_KEY,users));
+  setUsers(hydratedUsers);
+  const hydratedUser=hydratedUsers.find(item=>item.id===user?.id)||hydratedUsers.find(item=>item.email.toLowerCase()===user?.email.toLowerCase())||user;
+  window.sessionStorage.setItem(LOGIN_SESSION_KEY,hydratedUser.id);
+  setSignedInUserId(hydratedUser.id);
+  setActive(visibleModuleIdsForUser(hydratedUser).has("overview")?"overview":"");
   return "";
  };
- const signOut=()=>{window.sessionStorage.removeItem(LOGIN_SESSION_KEY);setSignedInUserId("");setActive("overview");setMobile(false)};
+ const signOut=()=>{window.sessionStorage.removeItem(LOGIN_SESSION_KEY);void signOutCloud();setSignedInUserId("");setActive("overview");setMobile(false)};
 
  const searchResults=useMemo(()=>{
   const term=deferredQuery.trim().toLowerCase();
@@ -116,7 +123,7 @@ export function ManagementApp(){
   <button className={mobile?"sidebarbackdrop show":"sidebarbackdrop"} aria-label="Close navigation" onClick={()=>setMobile(false)}/><aside className={mobile?"sidebar open":"sidebar"} aria-label="Main navigation">
    <div className="brand"><div className="brandmark">A3</div><div><strong>A3 MANAGEMENT</strong><span>Business Operating System</span></div><button className="close" aria-label="Close navigation" onClick={()=>setMobile(false)}><X/></button></div>
    <nav>{allowed.length?allowed.map(group=><div className="navgroup" key={group.label}><p>{group.label}</p>{group.items.map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?"navitem active":"navitem"} onClick={()=>selectPage(item.id)}><Icon size={17}/><span>{item.label}</span><ChevronRight size={15}/></button>})}</div>):<div className="navempty"><ShieldCheck size={20}/><strong>No modules assigned</strong><span>Ask an administrator to update this user.</span></div>}</nav>
-   <div className="sidebarfoot"><span>Connected services</span><div><i></i> Vercel ready</div><div><i></i> Speed Insights</div></div>
+   <div className="sidebarfoot"><span>Connected services</span><div><i></i> Supabase SQL sync</div><div><i></i> Vercel production</div></div>
   </aside>
   <main>
    <header>{isNavigating&&<span className="routeprogress" aria-label="Loading section"/>}<button className="menu" aria-label="Open navigation" aria-expanded={mobile} onClick={()=>setMobile(true)}><Menu/></button><div className="search searchglobal"><Search size={18}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search all information..."/>{query.trim().length>=2&&<div className="globalsearchresults">{searchResults.length?searchResults.map(result=><button key={result.id} onClick={()=>{selectPage(result.moduleId);setQuery("")}}><strong>{result.title}</strong><span>{result.detail}</span></button>):<div className="globalsearchempty">No matching information</div>}</div>}</div><button className="iconbtn" aria-label="Notifications"><Bell size={19}/><b></b></button><div className="signedinuser"><span>{currentUser.username}</span><strong>{roleLabel(currentUser.role)}</strong></div><div className="avatar" title={currentUser.email}>{initials}</div><button className="logoutbtn" onClick={signOut}><LogOut size={16}/><span>Sign out</span></button></header>
@@ -129,12 +136,13 @@ export function ManagementApp(){
  </div>
 }
 
-function LoginPage({onLogin}:{onLogin:(identifier:string,password:string)=>string}){
+function LoginPage({onLogin}:{onLogin:(identifier:string,password:string)=>Promise<string>}){
  const [identifier,setIdentifier]=useState("");
  const [password,setPassword]=useState("");
  const [error,setError]=useState("");
- const submit=(event:React.FormEvent<HTMLFormElement>)=>{event.preventDefault();const message=onLogin(identifier,password);setError(message)};
- return <main className="loginpage"><section className="logincard"><div className="loginbrand"><div className="brandmark">A3</div><div><strong>A3 MANAGEMENT</strong><span>Business Operating System</span></div></div><div className="loginintro"><span>SECURE ACCESS</span><h1>Sign in</h1><p>Use the username or email and password created in User Access.</p></div>{error&&<div className="formerror" role="alert">{error}</div>}<form onSubmit={submit}><label>Username or email<input autoFocus autoComplete="username" value={identifier} onChange={event=>setIdentifier(event.target.value)} placeholder="Username or email" required/></label><label>Password<input type="password" autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} placeholder="Password" required/></label><button className="primary loginbutton" type="submit">Sign in</button></form><p className="loginhint">Initial administrator login: <strong>{DEFAULT_ADMIN_USERNAME}</strong> / <strong>{DEFAULT_ADMIN_PASSWORD}</strong>. Change it in User Access after signing in.</p></section></main>
+ const [submitting,setSubmitting]=useState(false);
+ const submit=async(event:React.FormEvent<HTMLFormElement>)=>{event.preventDefault();setSubmitting(true);setError("");const message=await onLogin(identifier,password);setError(message);setSubmitting(false)};
+ return <main className="loginpage"><section className="logincard"><div className="loginbrand"><div className="brandmark">A3</div><div><strong>A3 MANAGEMENT</strong><span>Business Operating System</span></div></div><div className="loginintro"><span>SUPABASE SQL ACCESS</span><h1>Sign in</h1><p>Your A3 user email and password also secure the Supabase cloud records.</p></div>{error&&<div className="formerror" role="alert">{error}</div>}<form onSubmit={submit}><label>Username or email<input autoFocus autoComplete="username" value={identifier} onChange={event=>setIdentifier(event.target.value)} placeholder="Username or email" required disabled={submitting}/></label><label>Password<input type="password" autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} placeholder="Password" required disabled={submitting}/></label><button className="primary loginbutton" type="submit" disabled={submitting}>{submitting?"Connecting to Supabase…":"Sign in"}</button></form><p className="loginhint">Initial administrator login: <strong>{DEFAULT_ADMIN_USERNAME}</strong> / <strong>{DEFAULT_ADMIN_PASSWORD}</strong>. Run <strong>supabase/schema.sql</strong> before the first cloud login.</p></section></main>
 }
 
 function NoModuleAccess({user}:{user:UserAccessRecord}){return <div className="panel empty accessdenied"><ShieldCheck size={38}/><h2>{user.status==="Suspended"?"User access suspended":"No modules assigned"}</h2><p>{user.status==="Suspended"?`${user.name} is suspended and cannot open any workspace.`:`${user.name} does not currently have permission to view a module. Ask an administrator to update the user in User Access.`}</p></div>}

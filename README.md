@@ -48,3 +48,7 @@ The administrator sidebar combines Vehicle Rate, Driver Fix Rate, and Client Fix
 - Use the **Access preview** selector in the top bar to test an active user.
 - The User Access table and edit form show the exact modules assigned to each account.
 - Existing records that used the older labels such as `Booking`, `Rates`, or `GST Reports` are migrated automatically.
+
+## Supabase SQL cloud sync
+
+This build includes authenticated Supabase storage. Complete the steps in `SUPABASE_SETUP.md`, run `supabase/schema.sql`, add the two public environment variables to Vercel, and redeploy.

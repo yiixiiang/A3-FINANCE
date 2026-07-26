@@ -17,6 +17,8 @@ export async function GET() {
     {
       ok: true,
       application: "A3 Finance",
+      version: 22,
+      expectedSupabaseSchema: "storage+backups-v22",
       timestamp: new Date().toISOString(),
       supabase: {
         configured: Boolean(supabaseUrl && publishableKey),

@@ -1,30 +1,21 @@
--- A3 Finance Supabase verification (read-only)
--- Run in Supabase Dashboard > SQL Editor after schema.sql.
-
+-- FINANCE1 V22 Supabase verification
 select
-  to_regclass('public.a3_app_storage') as storage_table,
+  c.relname as table_name,
   c.relrowsecurity as rls_enabled
 from pg_class c
 join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public'
-  and c.relname = 'a3_app_storage';
+  and c.relname in ('a3_app_storage', 'a3_app_backups')
+order by c.relname;
 
 select
+  tablename,
   policyname,
-  cmd,
-  roles
+  cmd
 from pg_policies
 where schemaname = 'public'
-  and tablename = 'a3_app_storage'
-order by policyname;
+  and tablename in ('a3_app_storage', 'a3_app_backups')
+order by tablename, policyname;
 
 select
-  trigger_name,
-  event_manipulation,
-  action_timing
-from information_schema.triggers
-where event_object_schema = 'public'
-  and event_object_table = 'a3_app_storage';
-
-select count(*) as authentication_user_count
-from auth.users;
+  exists(select 1 from pg_trigger where tgname = 'a3_app_storage_touch_updated_at') as storage_update_trigger_ready;

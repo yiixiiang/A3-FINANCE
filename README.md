@@ -56,3 +56,7 @@ This build includes authenticated Supabase storage. Complete the steps in `SUPAB
 ## V21 Cloud & Backup
 
 Administrators can open **Fleet & Settings → Cloud & Backup** to verify Supabase, migrate local records, restore cloud records on another computer, and download a JSON backup. The saved Supabase session now resumes automatically after refreshing the page.
+
+## V22 Multi-Device Sync Safety
+
+V22 adds timestamp-aware Supabase merging, automatic online/focus synchronization, pending-save and conflict diagnostics, daily server-side backups, manual backup restore, and portable JSON backup import. Run `08-OPEN-V22-SQL-UPGRADE.cmd` before deploying with `09-DEPLOY-V22-SYNC-SAFETY.cmd`.

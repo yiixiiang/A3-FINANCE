@@ -1,12 +1,12 @@
 "use client";
 import dynamic from "next/dynamic";
-import { memo, useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { LayoutDashboard, CarFront, UtensilsCrossed, WalletCards, Percent, Network, Settings2, BarChart3, ReceiptText, FileText, Search, Bell, Menu, X, ChevronRight, Plus, TrendingUp, Users, Clock3, ShieldCheck, Globe2, Banknote, LogOut, Database, CloudUpload, CloudDownload, RefreshCw, HardDriveDownload, CheckCircle2, AlertTriangle } from "lucide-react";
 import { bookings } from "@/lib/data";
 import { load, saveNow, STORAGE_UPDATED_EVENT } from "@/lib/browser-storage";
 import { DRIVER_STORAGE_KEY, EXPENSE_STORAGE_KEY, INCOME_STORAGE_KEY, INVOICE_STORAGE_KEY, QUOTATION_STORAGE_KEY, calculateDocumentTotals, defaultDocumentRecords, defaultDriverOverviewRecords, defaultExpenseOverviewRecords, defaultIncomeOverviewRecords, normalizeDocumentRecords, type StoredDriverRecord, type StoredExpenseRecord, type StoredIncomeRecord } from "@/lib/finance-records";
 import { DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_USER, LOGIN_SESSION_KEY, USER_ACCESS_STORAGE_KEY, USER_ACCESS_UPDATED_EVENT, normalizeUserRecords, roleLabel, visibleModuleIdsForUser, type UserAccessRecord } from "@/lib/access-control";
-import { CLOUD_SYNC_STATE_EVENT, downloadLocalDataBackup, getCloudSyncSnapshot, resumeCloudSession, restoreAllCloudDataToLocal, signInAndHydrateCloud, signOutCloud, synchronizeCloudNow, uploadAllLocalDataToCloud, verifyCloudConnection, type CloudDiagnostics, type CloudSyncState } from "@/lib/supabase-cloud";
+import { CLOUD_SYNC_STATE_EVENT, clearCloudConflictHistory, createCloudBackup, downloadLocalDataBackup, getCloudConflictHistory, getCloudSyncSnapshot, importLocalDataBackup, listCloudBackups, resumeCloudSession, restoreAllCloudDataToLocal, restoreCloudBackup, signInAndHydrateCloud, signOutCloud, startCloudAutoSync, synchronizeCloudNow, uploadAllLocalDataToCloud, verifyCloudConnection, type CloudBackupSummary, type CloudDiagnostics, type CloudSyncState } from "@/lib/supabase-cloud";
 
 type Item={id:string;label:string;icon:any};
 const nav: {label:string;items:Item[]}[]=[
@@ -56,6 +56,7 @@ export function ManagementApp(){
  useEffect(()=>{
   if(!authReady||!signedInUserId)return;
   void resumeCloudSession();
+  return startCloudAutoSync();
  },[authReady,signedInUserId]);
 
  const currentUser=users.find(user=>user.id===signedInUserId);
@@ -168,41 +169,79 @@ function LoginPage({onLogin}:{onLogin:(identifier:string,password:string)=>Promi
 function CloudCenter(){
  const [snapshot,setSnapshot]=useState(()=>getCloudSyncSnapshot());
  const [diagnostics,setDiagnostics]=useState<CloudDiagnostics|null>(null);
+ const [backups,setBackups]=useState<CloudBackupSummary[]>([]);
+ const [conflicts,setConflicts]=useState(()=>getCloudConflictHistory());
  const [busy,setBusy]=useState("");
  const [notice,setNotice]=useState("");
  const [error,setError]=useState("");
+ const importRef=useRef<HTMLInputElement|null>(null);
+ const refreshDetails=async()=>{
+  setSnapshot(getCloudSyncSnapshot());
+  setConflicts(getCloudConflictHistory());
+  try{const result=await listCloudBackups();setBackups(result.backups);}catch{setBackups([]);}
+ };
  useEffect(()=>{
-  const refresh=()=>setSnapshot(getCloudSyncSnapshot());
+  const refresh=()=>{setSnapshot(getCloudSyncSnapshot());setConflicts(getCloudConflictHistory());};
   window.addEventListener(CLOUD_SYNC_STATE_EVENT,refresh);
-  void run("verify",false);
+  void (async()=>{try{setDiagnostics(await verifyCloudConnection());}catch{}await refreshDetails();})();
   return()=>window.removeEventListener(CLOUD_SYNC_STATE_EVENT,refresh);
  },[]);
- const run=async(action:"verify"|"sync"|"upload"|"restore",confirmAction=true)=>{
+ const run=async(action:"verify"|"sync"|"upload"|"restore"|"backup",confirmAction=true)=>{
   if(confirmAction&&action==="upload"&&!window.confirm("Upload all saved records from this computer to Supabase? Existing cloud keys with the same name will be updated."))return;
   if(confirmAction&&action==="restore"&&!window.confirm("Restore all Supabase records to this computer? Cloud values will replace matching local records."))return;
   setBusy(action);setNotice("");setError("");
   try{
-   const result=action==="verify"?await verifyCloudConnection():action==="sync"?await synchronizeCloudNow():action==="upload"?await uploadAllLocalDataToCloud():await restoreAllCloudDataToLocal();
-   setDiagnostics(result);
-   setNotice(action==="verify"?"Connection check completed.":action==="sync"?"Local and cloud records synchronized.":action==="upload"?"This computer's records were uploaded to Supabase.":"Cloud records were restored to this computer.");
+   if(action==="backup"){
+    await createCloudBackup("manual");
+    setNotice("A new cloud backup was created.");
+    setDiagnostics(await verifyCloudConnection());
+   }else{
+    const result=action==="verify"?await verifyCloudConnection():action==="sync"?await synchronizeCloudNow():action==="upload"?await uploadAllLocalDataToCloud():await restoreAllCloudDataToLocal();
+    setDiagnostics(result);
+    setNotice(action==="verify"?"Connection check completed.":action==="sync"?"Multi-device synchronization completed.":action==="upload"?"This computer's records were uploaded to Supabase.":"Cloud records were restored to this computer.");
+   }
   }catch(reason){setError(reason instanceof Error?reason.message:"Cloud operation failed.");}
-  finally{setBusy("");setSnapshot(getCloudSyncSnapshot());}
+  finally{setBusy("");await refreshDetails();}
+ };
+ const restoreBackup=async(backup:CloudBackupSummary)=>{
+  if(!window.confirm(`Restore cloud backup from ${new Date(backup.createdAt).toLocaleString("en-SG")}? Current matching records will be replaced.`))return;
+  setBusy(`restore-${backup.id}`);setNotice("");setError("");
+  try{setDiagnostics(await restoreCloudBackup(backup.id));setNotice("Cloud backup restored and synchronized.");}
+  catch(reason){setError(reason instanceof Error?reason.message:"Backup restore failed.");}
+  finally{setBusy("");await refreshDetails();}
+ };
+ const importBackup=async(event:React.ChangeEvent<HTMLInputElement>)=>{
+  const file=event.target.files?.[0];event.target.value="";if(!file)return;
+  if(!window.confirm(`Import ${file.name} into this computer? Matching local records will be replaced.`))return;
+  setBusy("import");setNotice("");setError("");
+  try{const count=await importLocalDataBackup(file);setNotice(`${count} record groups imported. Use Sync now to upload them.`);setDiagnostics(await verifyCloudConnection());}
+  catch(reason){setError(reason instanceof Error?reason.message:"Backup import failed.");}
+  finally{setBusy("");await refreshDetails();}
  };
  const size=diagnostics?diagnostics.localBytes<1024?`${diagnostics.localBytes} B`:diagnostics.localBytes<1048576?`${(diagnostics.localBytes/1024).toFixed(1)} KB`:`${(diagnostics.localBytes/1048576).toFixed(2)} MB`:"—";
- return <><Heading eyebrow="SUPABASE · CLOUD STORAGE" title="Cloud & Backup" copy="Verify Supabase, synchronize saved business records, and keep a downloadable backup before moving data between computers."/>
- <div className="cloudsummary">
-  <div className={`cloudhero cloudhero-${snapshot.state}`}><div><span>CONNECTION</span><h2>{snapshot.state==="connected"?"Supabase connected":snapshot.state==="syncing"?"Synchronizing records":snapshot.state==="connecting"?"Checking connection":snapshot.state==="disabled"?"Supabase not configured":"Cloud attention required"}</h2><p>{snapshot.error||snapshot.email||"Use Verify connection to test the current Supabase session."}</p></div>{snapshot.state==="connected"?<CheckCircle2 size={38}/>:<AlertTriangle size={38}/>}</div>
-  <div className="cloudmetric"><span>Local storage keys</span><strong>{diagnostics?.localKeyCount??"—"}</strong><small>{size}</small></div>
-  <div className="cloudmetric"><span>Cloud storage keys</span><strong>{diagnostics?.cloudKeyCount??"—"}</strong><small>{diagnostics?.email||snapshot.email||"Not signed in"}</small></div>
+ const lastSync=diagnostics?.lastSyncAt||snapshot.lastSyncAt;
+ return <><Heading eyebrow="SUPABASE · MULTI-DEVICE SAFETY" title="Cloud & Backup" copy="Synchronize safely between computers, review conflicts, and keep automatic cloud backups before data is replaced."/>
+ <div className="cloudsummary cloudsummary-v22">
+  <div className={`cloudhero cloudhero-${snapshot.state}`}><div><span>CONNECTION</span><h2>{snapshot.state==="connected"?"Supabase connected":snapshot.state==="syncing"?"Synchronizing records":snapshot.state==="connecting"?"Checking connection":snapshot.state==="disabled"?"Supabase not configured":"Cloud attention required"}</h2><p>{snapshot.error||snapshot.email||"Use Verify connection to test the current Supabase session."}</p><small>{lastSync?`Last sync: ${new Date(lastSync).toLocaleString("en-SG")}`:"No completed sync recorded yet"}</small></div>{snapshot.state==="connected"?<CheckCircle2 size={38}/>:<AlertTriangle size={38}/>}</div>
+  <div className="cloudmetric"><span>Local record groups</span><strong>{diagnostics?.localKeyCount??"—"}</strong><small>{size}</small></div>
+  <div className="cloudmetric"><span>Cloud record groups</span><strong>{diagnostics?.cloudKeyCount??"—"}</strong><small>{diagnostics?.email||snapshot.email||"Not signed in"}</small></div>
+  <div className="cloudmetric"><span>Pending saves</span><strong>{diagnostics?.pendingWriteCount??snapshot.pendingWriteCount}</strong><small>Automatically retried</small></div>
+  <div className="cloudmetric"><span>Conflict history</span><strong>{diagnostics?.conflictCount??conflicts.length}</strong><small>Newest value kept</small></div>
+  <div className="cloudmetric"><span>Cloud backups</span><strong>{diagnostics?.backupCount??backups.length}</strong><small>{diagnostics?.latestBackupAt?new Date(diagnostics.latestBackupAt).toLocaleDateString("en-SG"):diagnostics?.backupTableReady===false?"Run latest SQL schema":"Daily + manual"}</small></div>
  </div>
  {(notice||error)&&<div className={error?"cloudnotice error":"cloudnotice success"}>{error||notice}</div>}
- <div className="cloudactiongrid">
-  <section><RefreshCw size={25}/><h3>Verify and synchronize</h3><p>Checks the authenticated Supabase session and safely merges available records.</p><div><button className="primary" disabled={Boolean(busy)} onClick={()=>void run("verify")}>{busy==="verify"?"Checking…":"Verify connection"}</button><button className="ghost" disabled={Boolean(busy)} onClick={()=>void run("sync")}>{busy==="sync"?"Syncing…":"Sync now"}</button></div></section>
-  <section><CloudUpload size={25}/><h3>Upload this computer</h3><p>Pushes every syncable A3 record saved in this browser to the signed-in Supabase account.</p><button className="primary" disabled={Boolean(busy)} onClick={()=>void run("upload")}>{busy==="upload"?"Uploading…":"Upload local records"}</button></section>
-  <section><CloudDownload size={25}/><h3>Restore from Supabase</h3><p>Downloads cloud values and replaces matching records on this computer. Other local-only records are kept.</p><button className="primary" disabled={Boolean(busy)} onClick={()=>void run("restore")}>{busy==="restore"?"Restoring…":"Restore cloud records"}</button></section>
-  <section><HardDriveDownload size={25}/><h3>Download local backup</h3><p>Creates a JSON backup of the current browser records before a migration or major update.</p><button className="ghost" onClick={downloadLocalDataBackup}>Download backup</button></section>
+ <div className="cloudactiongrid cloudactiongrid-v22">
+  <section><RefreshCw size={25}/><h3>Verify and synchronize</h3><p>Checks the authenticated session, compares update times, preserves conflicts, and merges the newest records.</p><div><button className="primary" disabled={Boolean(busy)} onClick={()=>void run("verify")}>{busy==="verify"?"Checking…":"Verify connection"}</button><button className="ghost" disabled={Boolean(busy)} onClick={()=>void run("sync")}>{busy==="sync"?"Syncing…":"Sync now"}</button></div></section>
+  <section><CloudUpload size={25}/><h3>Upload this computer</h3><p>Uses this computer as the source for all matching cloud record groups and creates a safety backup.</p><button className="primary" disabled={Boolean(busy)} onClick={()=>void run("upload")}>{busy==="upload"?"Uploading…":"Upload local records"}</button></section>
+  <section><CloudDownload size={25}/><h3>Restore live cloud records</h3><p>Downloads current Supabase values and replaces matching records on this computer.</p><button className="primary" disabled={Boolean(busy)} onClick={()=>void run("restore")}>{busy==="restore"?"Restoring…":"Restore cloud records"}</button></section>
+  <section><Database size={25}/><h3>Create cloud backup</h3><p>Saves a dated server-side snapshot. Automatic backups are created at most once per day.</p><button className="primary" disabled={Boolean(busy)} onClick={()=>void run("backup")}>{busy==="backup"?"Backing up…":"Create backup now"}</button></section>
+  <section><HardDriveDownload size={25}/><h3>Local JSON backup</h3><p>Download a portable backup or import one from another computer before synchronizing.</p><div><button className="ghost" onClick={downloadLocalDataBackup}>Download backup</button><button className="ghost" disabled={Boolean(busy)} onClick={()=>importRef.current?.click()}>{busy==="import"?"Importing…":"Import backup"}</button><input ref={importRef} className="sr-only" type="file" accept="application/json,.json" onChange={event=>void importBackup(event)}/></div></section>
  </div>
- <div className="panel cloudchecklist"><div className="panelhead"><div><span>FIRST-TIME CLOUD CHECKLIST</span><h2>Activation order</h2></div></div><ol><li>Run <strong>supabase/schema.sql</strong> in the Supabase SQL Editor.</li><li>Confirm the matching user exists in Supabase Authentication and is email-confirmed.</li><li>Add both Supabase environment variables to Vercel, then redeploy production.</li><li>Sign out and sign in once to establish the cloud session.</li><li>Open this page and use <strong>Verify connection</strong>, then <strong>Upload local records</strong>.</li></ol>{diagnostics?.checkedAt&&<small>Last checked: {new Date(diagnostics.checkedAt).toLocaleString("en-SG")}</small>}</div></>;
+ <div className="cloudtwocolumn">
+  <div className="panel cloudbackups"><div className="panelhead"><div><span>SERVER-SIDE HISTORY</span><h2>Recent cloud backups</h2></div></div>{backups.length?<div className="cloudbackuplist">{backups.slice(0,10).map(backup=><div key={backup.id}><div><strong>{new Date(backup.createdAt).toLocaleString("en-SG")}</strong><span>{backup.reason.replaceAll("-"," ")} · {backup.keyCount} groups</span></div><button className="ghost" disabled={Boolean(busy)} onClick={()=>void restoreBackup(backup)}>{busy===`restore-${backup.id}`?"Restoring…":"Restore"}</button></div>)}</div>:<div className="empty compact"><p>{diagnostics?.backupTableReady===false?"Run the latest supabase/schema.sql to enable cloud backup history.":"No cloud backups yet."}</p></div>}</div>
+  <div className="panel cloudconflicts"><div className="panelhead"><div><span>MULTI-DEVICE AUDIT</span><h2>Conflict history</h2></div>{conflicts.length>0&&<button className="ghost" onClick={()=>{clearCloudConflictHistory();setConflicts([])}}>Clear history</button>}</div>{conflicts.length?<div className="cloudconflictlist">{conflicts.slice(0,10).map(item=><div key={item.id}><strong>{item.storageKey}</strong><span>{new Date(item.detectedAt).toLocaleString("en-SG")} · kept {item.resolution==="cloud-first-sync"?"cloud on first sync":item.resolution}</span></div>)}</div>:<div className="empty compact"><p>No conflicting changes detected.</p></div>}</div>
+ </div>
+ <div className="panel cloudchecklist"><div className="panelhead"><div><span>V22 DATABASE UPGRADE</span><h2>Activation order</h2></div></div><ol><li>Run the latest <strong>supabase/schema.sql</strong> to add secure backup history.</li><li>Redeploy V22 so Vercel uses the updated cloud synchronization code.</li><li>Sign out and sign in once, then open this page.</li><li>Use <strong>Verify connection</strong> and confirm the backup table shows ready.</li><li>Create one manual cloud backup before using a second computer.</li></ol>{diagnostics?.checkedAt&&<small>Last checked: {new Date(diagnostics.checkedAt).toLocaleString("en-SG")}</small>}</div></>;
 }
 
 function NoModuleAccess({user}:{user:UserAccessRecord}){return <div className="panel empty accessdenied"><ShieldCheck size={38}/><h2>{user.status==="Suspended"?"User access suspended":"No modules assigned"}</h2><p>{user.status==="Suspended"?`${user.name} is suspended and cannot open any workspace.`:`${user.name} does not currently have permission to view a module. Ask an administrator to update the user in User Access.`}</p></div>}

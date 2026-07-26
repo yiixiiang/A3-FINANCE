@@ -37,3 +37,7 @@ When a user signs in successfully:
 - Financial, company, driver, invoice, quotation, rate and balance records are synced.
 - The local `a3-user-access` record is intentionally not uploaded because the legacy app stores local passwords in that record. Supabase Auth protects the cloud account password instead.
 - Each Supabase Auth user can read and change only their own rows because Row Level Security is enabled.
+
+## V22 backup upgrade
+
+After the original storage schema is active, run `supabase/v22-upgrade.sql` once. It creates `a3_app_backups`, enables Row Level Security, and allows each authenticated user to access only their own backup snapshots. The complete `supabase/schema.sql` also includes this upgrade and remains safe to run again.

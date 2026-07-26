@@ -10,6 +10,29 @@ export type CloudDiagnostics = {
   cloudKeyCount: number;
   localBytes: number;
   checkedAt: string;
+  lastSyncAt: string;
+  pendingWriteCount: number;
+  conflictCount: number;
+  backupTableReady: boolean;
+  backupCount: number;
+  latestBackupAt: string;
+};
+
+export type CloudBackupSummary = {
+  id: string;
+  createdAt: string;
+  reason: string;
+  keyCount: number;
+  deviceId: string;
+};
+
+export type CloudConflict = {
+  id: string;
+  storageKey: string;
+  detectedAt: string;
+  localUpdatedAt: string;
+  cloudUpdatedAt: string;
+  resolution: "local" | "cloud" | "cloud-first-sync";
 };
 
 export const CLOUD_SYNC_STATE_EVENT = "a3-cloud-sync-state";
@@ -20,7 +43,19 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
 const SESSION_STORAGE_KEY = "sb-a3-finance-session-v1";
 const SYNCABLE_KEY_PREFIX = "a3-";
 const STORAGE_UPDATED_EVENT = "a3-storage-updated";
-const LOCAL_ONLY_KEYS = new Set(["a3-user-access"]);
+const SYNC_META_KEY = "a3-cloud-sync-meta-v22";
+const CONFLICT_HISTORY_KEY = "a3-cloud-conflicts-v22";
+const DEVICE_ID_KEY = "a3-cloud-device-v22";
+const FIRST_SYNC_BACKUP_KEY = "a3-cloud-first-sync-backup-v22";
+const APP_VERSION = 22;
+const AUTO_SYNC_INTERVAL_MS = 90_000;
+const LOCAL_ONLY_KEYS = new Set([
+  "a3-user-access",
+  SYNC_META_KEY,
+  CONFLICT_HISTORY_KEY,
+  DEVICE_ID_KEY,
+  FIRST_SYNC_BACKUP_KEY,
+]);
 
 function isSyncableKey(key: string): boolean {
   return key.startsWith(SYNCABLE_KEY_PREFIX) && !LOCAL_ONLY_KEYS.has(key);
@@ -49,11 +84,33 @@ type CloudStorageRow = {
   updated_at?: string;
 };
 
+type CloudBackupRow = {
+  id: string;
+  created_at: string;
+  reason: string;
+  key_count: number;
+  device_id?: string;
+  payload?: Record<string, unknown>;
+};
+
+type KeySyncMeta = {
+  localUpdatedAt?: string;
+  cloudUpdatedAt?: string;
+  lastSyncedAt?: string;
+};
+
+type SyncMetaStore = {
+  version: number;
+  lastSyncAt: string;
+  keys: Record<string, KeySyncMeta>;
+};
+
 let activeSession: CloudSession | null = null;
 let state: CloudSyncState = SUPABASE_URL && SUPABASE_KEY ? "signed-out" : "disabled";
 let lastError = "";
 const pendingCloudWrites = new Map<string, unknown>();
 let cloudFlushTimer: number | null = null;
+let autoSyncRunning = false;
 
 function emitState(next: CloudSyncState, error = ""): void {
   state = next;
@@ -127,6 +184,78 @@ async function usableSession(): Promise<CloudSession | null> {
   return refreshSession(session);
 }
 
+function readJson<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJson(key: string, value: unknown): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Local storage may be full. Cloud operations must remain usable.
+  }
+}
+
+function getDeviceId(): string {
+  if (typeof window === "undefined") return "server";
+  const existing = window.localStorage.getItem(DEVICE_ID_KEY);
+  if (existing) return existing;
+  const generated = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `device-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  window.localStorage.setItem(DEVICE_ID_KEY, generated);
+  return generated;
+}
+
+function readSyncMeta(): SyncMetaStore {
+  const value = readJson<SyncMetaStore>(SYNC_META_KEY, { version: APP_VERSION, lastSyncAt: "", keys: {} });
+  return value && typeof value === "object" && value.keys
+    ? { version: APP_VERSION, lastSyncAt: value.lastSyncAt || "", keys: value.keys || {} }
+    : { version: APP_VERSION, lastSyncAt: "", keys: {} };
+}
+
+function writeSyncMeta(meta: SyncMetaStore): void {
+  writeJson(SYNC_META_KEY, { ...meta, version: APP_VERSION });
+}
+
+function markLocalMutation(key: string): void {
+  if (!isSyncableKey(key) || typeof window === "undefined") return;
+  const meta = readSyncMeta();
+  meta.keys[key] = { ...meta.keys[key], localUpdatedAt: new Date().toISOString() };
+  writeSyncMeta(meta);
+}
+
+function applyCloudValue(key: string, value: unknown, cloudUpdatedAt = ""): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(key, JSON.stringify(value));
+  const now = new Date().toISOString();
+  const meta = readSyncMeta();
+  meta.keys[key] = {
+    ...meta.keys[key],
+    cloudUpdatedAt: cloudUpdatedAt || now,
+    localUpdatedAt: cloudUpdatedAt || now,
+    lastSyncedAt: now,
+  };
+  meta.lastSyncAt = now;
+  writeSyncMeta(meta);
+  window.dispatchEvent(new CustomEvent(STORAGE_UPDATED_EVENT, { detail: { key } }));
+}
+
+function valuesEqual(left: unknown, right: unknown): boolean {
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return false;
+  }
+}
+
 function syncableLocalEntries(): Array<[string, unknown]> {
   if (typeof window === "undefined") return [];
   const entries: Array<[string, unknown]> = [];
@@ -140,6 +269,23 @@ function syncableLocalEntries(): Array<[string, unknown]> {
     }
   }
   return entries;
+}
+
+function readConflicts(): CloudConflict[] {
+  const conflicts = readJson<CloudConflict[]>(CONFLICT_HISTORY_KEY, []);
+  return Array.isArray(conflicts) ? conflicts : [];
+}
+
+function recordConflict(storageKey: string, localUpdatedAt: string, cloudUpdatedAt: string, resolution: CloudConflict["resolution"]): void {
+  const conflict: CloudConflict = {
+    id: `conflict-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    storageKey,
+    detectedAt: new Date().toISOString(),
+    localUpdatedAt,
+    cloudUpdatedAt,
+    resolution,
+  };
+  writeJson(CONFLICT_HISTORY_KEY, [conflict, ...readConflicts()].slice(0, 30));
 }
 
 async function cloudRequest(path: string, init: RequestInit = {}, retry = true): Promise<Response> {
@@ -162,7 +308,7 @@ async function cloudRequest(path: string, init: RequestInit = {}, retry = true):
 async function upsertRows(entries: Array<[string, unknown]>): Promise<void> {
   if (!entries.length) return;
   const session = await usableSession();
-  if (!session) return;
+  if (!session) throw new Error("Cloud session is not available.");
   const rows = entries.map(([storage_key, value]) => ({ user_id: session.user.id, storage_key, value }));
   const response = await cloudRequest("/rest/v1/a3_app_storage?on_conflict=user_id,storage_key", {
     method: "POST",
@@ -173,12 +319,17 @@ async function upsertRows(entries: Array<[string, unknown]>): Promise<void> {
     const detail = await response.text().catch(() => "");
     throw new Error(detail || `Cloud save failed (${response.status}).`);
   }
+  const now = new Date().toISOString();
+  const meta = readSyncMeta();
+  for (const [key] of entries) {
+    meta.keys[key] = { ...meta.keys[key], cloudUpdatedAt: now, localUpdatedAt: now, lastSyncedAt: now };
+  }
+  meta.lastSyncAt = now;
+  writeSyncMeta(meta);
 }
 
 async function fetchCloudRows(): Promise<CloudStorageRow[]> {
-  const response = await cloudRequest("/rest/v1/a3_app_storage?select=storage_key,value,updated_at&order=updated_at.asc", {
-    method: "GET",
-  });
+  const response = await cloudRequest("/rest/v1/a3_app_storage?select=storage_key,value,updated_at&order=updated_at.asc", { method: "GET" });
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     throw new Error(detail || `Cloud load failed (${response.status}).`);
@@ -187,13 +338,161 @@ async function fetchCloudRows(): Promise<CloudStorageRow[]> {
   return Array.isArray(rows) ? rows : [];
 }
 
+async function fetchBackupRows(includePayload = false): Promise<{ ready: boolean; rows: CloudBackupRow[] }> {
+  const select = includePayload ? "id,created_at,reason,key_count,device_id,payload" : "id,created_at,reason,key_count,device_id";
+  const response = await cloudRequest(`/rest/v1/a3_app_backups?select=${select}&order=created_at.desc&limit=20`, { method: "GET" });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    if (response.status === 404 || /a3_app_backups|relation .* does not exist/i.test(detail)) return { ready: false, rows: [] };
+    throw new Error(detail || `Cloud backup check failed (${response.status}).`);
+  }
+  const rows = (await response.json()) as CloudBackupRow[];
+  return { ready: true, rows: Array.isArray(rows) ? rows : [] };
+}
+
+async function createCloudBackupInternal(reason: string, entries = syncableLocalEntries()): Promise<CloudBackupSummary> {
+  const session = await usableSession();
+  if (!session) throw new Error("Cloud session is not available.");
+  const payload = Object.fromEntries(entries);
+  const response = await cloudRequest("/rest/v1/a3_app_backups", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      user_id: session.user.id,
+      reason,
+      key_count: entries.length,
+      device_id: getDeviceId(),
+      app_version: APP_VERSION,
+      payload,
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    if (response.status === 404 || /a3_app_backups|relation .* does not exist/i.test(detail)) {
+      throw new Error("Cloud backup table is missing. Run the latest supabase/schema.sql first.");
+    }
+    throw new Error(detail || `Cloud backup failed (${response.status}).`);
+  }
+  const rows = (await response.json().catch(() => [])) as CloudBackupRow[];
+  const row = rows[0];
+  if (!row) throw new Error("Cloud backup was created but no confirmation was returned.");
+  await pruneCloudBackups();
+  return { id: row.id, createdAt: row.created_at, reason: row.reason, keyCount: row.key_count, deviceId: row.device_id || "" };
+}
+
+async function pruneCloudBackups(): Promise<void> {
+  const { ready, rows } = await fetchBackupRows(false);
+  if (!ready || rows.length <= 10) return;
+  const ids = rows.slice(10).map(row => row.id).filter(Boolean);
+  if (!ids.length) return;
+  const filter = ids.join(",");
+  await cloudRequest(`/rest/v1/a3_app_backups?id=in.(${filter})`, { method: "DELETE" }).catch(() => undefined);
+}
+
+async function ensureDailyCloudBackup(): Promise<void> {
+  try {
+    const { ready, rows } = await fetchBackupRows(false);
+    if (!ready) return;
+    const latest = rows[0]?.created_at ? Date.parse(rows[0].created_at) : 0;
+    if (!latest || Date.now() - latest >= 24 * 60 * 60 * 1000) {
+      await createCloudBackupInternal("automatic-daily");
+    }
+  } catch {
+    // Daily backups must never block normal saving or sign in.
+  }
+}
+
+async function safeMergeCloudStorage(): Promise<void> {
+  if (!isSupabaseConfigured() || typeof window === "undefined") return;
+  const session = await usableSession();
+  if (!session) return;
+
+  const localEntries = syncableLocalEntries();
+  const localMap = new Map(localEntries);
+  const cloudRows = await fetchCloudRows();
+  const cloudMap = new Map(cloudRows.map(row => [row.storage_key, row]));
+  const meta = readSyncMeta();
+  const toUpload: Array<[string, unknown]> = [];
+
+  if (cloudRows.length === 0) {
+    await upsertRows(localEntries);
+    window.dispatchEvent(new CustomEvent(CLOUD_SYNCED_EVENT));
+    return;
+  }
+
+  if (!meta.lastSyncAt && localEntries.length && !window.localStorage.getItem(FIRST_SYNC_BACKUP_KEY)) {
+    try {
+      const backup = await createCloudBackupInternal("pre-first-sync-local", localEntries);
+      window.localStorage.setItem(FIRST_SYNC_BACKUP_KEY, backup.id);
+    } catch {
+      window.localStorage.setItem(FIRST_SYNC_BACKUP_KEY, "unavailable");
+    }
+  }
+
+  for (const row of cloudRows) {
+    const key = row.storage_key;
+    const cloudUpdatedAt = row.updated_at || new Date().toISOString();
+    if (!localMap.has(key)) {
+      applyCloudValue(key, row.value, cloudUpdatedAt);
+      continue;
+    }
+
+    const localValue = localMap.get(key);
+    if (valuesEqual(localValue, row.value)) {
+      const now = new Date().toISOString();
+      const currentMeta = readSyncMeta();
+      currentMeta.keys[key] = { ...currentMeta.keys[key], cloudUpdatedAt, localUpdatedAt: cloudUpdatedAt, lastSyncedAt: now };
+      currentMeta.lastSyncAt = now;
+      writeSyncMeta(currentMeta);
+      continue;
+    }
+
+    const keyMeta = meta.keys[key] || {};
+    const localUpdatedAt = keyMeta.localUpdatedAt || "";
+    const lastSyncedAt = keyMeta.lastSyncedAt || "";
+    const localChanged = Boolean(localUpdatedAt && (!lastSyncedAt || Date.parse(localUpdatedAt) > Date.parse(lastSyncedAt)));
+    const cloudChanged = Boolean(!lastSyncedAt || Date.parse(cloudUpdatedAt) > Date.parse(lastSyncedAt));
+
+    if (!lastSyncedAt) {
+      recordConflict(key, localUpdatedAt, cloudUpdatedAt, "cloud-first-sync");
+      applyCloudValue(key, row.value, cloudUpdatedAt);
+    } else if (localChanged && cloudChanged) {
+      const useLocal = Date.parse(localUpdatedAt) >= Date.parse(cloudUpdatedAt);
+      recordConflict(key, localUpdatedAt, cloudUpdatedAt, useLocal ? "local" : "cloud");
+      if (useLocal) toUpload.push([key, localValue]);
+      else applyCloudValue(key, row.value, cloudUpdatedAt);
+    } else if (localChanged) {
+      toUpload.push([key, localValue]);
+    } else {
+      applyCloudValue(key, row.value, cloudUpdatedAt);
+    }
+  }
+
+  for (const [key, value] of localEntries) {
+    if (!cloudMap.has(key)) toUpload.push([key, value]);
+  }
+
+  if (toUpload.length) await upsertRows(toUpload);
+  const completed = readSyncMeta();
+  completed.lastSyncAt = new Date().toISOString();
+  writeSyncMeta(completed);
+  window.dispatchEvent(new CustomEvent(CLOUD_SYNCED_EVENT));
+}
+
 export function isSupabaseConfigured(): boolean {
   return Boolean(SUPABASE_URL && SUPABASE_KEY);
 }
 
-export function getCloudSyncSnapshot(): { state: CloudSyncState; error: string; email: string } {
+export function getCloudSyncSnapshot(): { state: CloudSyncState; error: string; email: string; lastSyncAt: string; pendingWriteCount: number; conflictCount: number } {
   const session = restoreSession();
-  return { state, error: lastError, email: session?.user.email || "" };
+  return {
+    state,
+    error: lastError,
+    email: session?.user.email || "",
+    lastSyncAt: readSyncMeta().lastSyncAt,
+    pendingWriteCount: pendingCloudWrites.size,
+    conflictCount: readConflicts().length,
+  };
 }
 
 export function getLocalCloudInventory(): { keyCount: number; bytes: number } {
@@ -207,23 +506,63 @@ export function getLocalCloudInventory(): { keyCount: number; bytes: number } {
   return { keyCount, bytes };
 }
 
+export function getCloudConflictHistory(): CloudConflict[] {
+  return readConflicts();
+}
+
+export function clearCloudConflictHistory(): void {
+  writeJson(CONFLICT_HISTORY_KEY, []);
+  emitState(state, lastError);
+}
+
+export async function listCloudBackups(): Promise<{ ready: boolean; backups: CloudBackupSummary[] }> {
+  if (!isSupabaseConfigured()) return { ready: false, backups: [] };
+  const session = await usableSession();
+  if (!session) return { ready: false, backups: [] };
+  const { ready, rows } = await fetchBackupRows(false);
+  return {
+    ready,
+    backups: rows.map(row => ({ id: row.id, createdAt: row.created_at, reason: row.reason, keyCount: row.key_count, deviceId: row.device_id || "" })),
+  };
+}
+
 export async function verifyCloudConnection(): Promise<CloudDiagnostics> {
   const inventory = getLocalCloudInventory();
   const configured = isSupabaseConfigured();
   const session = configured ? await usableSession() : null;
+  const base = {
+    localKeyCount: inventory.keyCount,
+    localBytes: inventory.bytes,
+    checkedAt: new Date().toISOString(),
+    lastSyncAt: readSyncMeta().lastSyncAt,
+    pendingWriteCount: pendingCloudWrites.size,
+    conflictCount: readConflicts().length,
+  };
   if (!configured) {
     emitState("disabled");
-    return { configured: false, signedIn: false, email: "", localKeyCount: inventory.keyCount, cloudKeyCount: 0, localBytes: inventory.bytes, checkedAt: new Date().toISOString() };
+    return { configured: false, signedIn: false, email: "", cloudKeyCount: 0, backupTableReady: false, backupCount: 0, latestBackupAt: "", ...base };
   }
   if (!session) {
     emitState("signed-out", "Cloud session is not available. Sign out and sign in again to reconnect.");
-    return { configured: true, signedIn: false, email: "", localKeyCount: inventory.keyCount, cloudKeyCount: 0, localBytes: inventory.bytes, checkedAt: new Date().toISOString() };
+    return { configured: true, signedIn: false, email: "", cloudKeyCount: 0, backupTableReady: false, backupCount: 0, latestBackupAt: "", ...base };
   }
   emitState("connecting");
   try {
-    const rows = await fetchCloudRows();
+    const [rows, backupResult] = await Promise.all([fetchCloudRows(), fetchBackupRows(false)]);
     emitState("connected");
-    return { configured: true, signedIn: true, email: session.user.email || "", localKeyCount: inventory.keyCount, cloudKeyCount: rows.length, localBytes: inventory.bytes, checkedAt: new Date().toISOString() };
+    return {
+      configured: true,
+      signedIn: true,
+      email: session.user.email || "",
+      cloudKeyCount: rows.length,
+      backupTableReady: backupResult.ready,
+      backupCount: backupResult.rows.length,
+      latestBackupAt: backupResult.rows[0]?.created_at || "",
+      ...base,
+      lastSyncAt: readSyncMeta().lastSyncAt,
+      pendingWriteCount: pendingCloudWrites.size,
+      conflictCount: readConflicts().length,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Cloud verification failed.";
     emitState("error", message);
@@ -270,7 +609,8 @@ export async function signInAndHydrateCloud(email: string, password: string): Pr
 
     persistSession(session);
     emitState("syncing");
-    await hydrateCloudStorage();
+    await safeMergeCloudStorage();
+    await ensureDailyCloudBackup();
     emitState("connected");
     return { ok: true, message: created ? "Cloud account created and connected." : "Supabase connected.", created };
   } catch (error) {
@@ -281,27 +621,10 @@ export async function signInAndHydrateCloud(email: string, password: string): Pr
 }
 
 export async function hydrateCloudStorage(): Promise<void> {
-  if (!isSupabaseConfigured() || typeof window === "undefined") return;
-  const session = await usableSession();
-  if (!session) return;
-  const localEntries = syncableLocalEntries();
-  const cloudRows = await fetchCloudRows();
-  const cloudKeys = new Set(cloudRows.map(row => row.storage_key));
-
-  if (cloudRows.length === 0) {
-    await upsertRows(localEntries);
-  } else {
-    for (const row of cloudRows) {
-      window.localStorage.setItem(row.storage_key, JSON.stringify(row.value));
-      window.dispatchEvent(new CustomEvent(STORAGE_UPDATED_EVENT, { detail: { key: row.storage_key } }));
-    }
-    const localOnly = localEntries.filter(([key]) => !cloudKeys.has(key));
-    await upsertRows(localOnly);
-  }
-  window.dispatchEvent(new CustomEvent(CLOUD_SYNCED_EVENT));
+  await safeMergeCloudStorage();
 }
 
-async function flushCloudWrites(): Promise<void> {
+export async function flushPendingCloudWrites(): Promise<void> {
   cloudFlushTimer = null;
   if (!pendingCloudWrites.size) return;
   const entries = Array.from(pendingCloudWrites.entries());
@@ -313,21 +636,23 @@ async function flushCloudWrites(): Promise<void> {
     entries.forEach(([key, value]) => pendingCloudWrites.set(key, value));
     const message = error instanceof Error ? error.message : "Cloud save failed.";
     emitState("error", message);
+    throw error;
   }
 }
 
 export function queueCloudWrite(key: string, value: unknown, immediate = false): void {
-  if (!isSyncableKey(key) || !isSupabaseConfigured() || typeof window === "undefined") return;
-  if (!restoreSession()) return;
+  if (!isSyncableKey(key) || typeof window === "undefined") return;
+  markLocalMutation(key);
+  if (!isSupabaseConfigured() || !restoreSession()) return;
   pendingCloudWrites.set(key, value);
+  emitState("syncing");
   if (cloudFlushTimer !== null) window.clearTimeout(cloudFlushTimer);
   if (immediate) {
-    void flushCloudWrites();
+    void flushPendingCloudWrites().catch(() => undefined);
     return;
   }
-  cloudFlushTimer = window.setTimeout(() => void flushCloudWrites(), 450);
+  cloudFlushTimer = window.setTimeout(() => void flushPendingCloudWrites().catch(() => undefined), 450);
 }
-
 
 export async function resumeCloudSession(): Promise<{ ok: boolean; message: string }> {
   if (!isSupabaseConfigured()) {
@@ -341,7 +666,8 @@ export async function resumeCloudSession(): Promise<{ ok: boolean; message: stri
   }
   emitState("syncing");
   try {
-    await hydrateCloudStorage();
+    await safeMergeCloudStorage();
+    await ensureDailyCloudBackup();
     emitState("connected");
     return { ok: true, message: "Cloud session restored and synchronized." };
   } catch (error) {
@@ -356,8 +682,10 @@ export async function uploadAllLocalDataToCloud(): Promise<CloudDiagnostics> {
   const session = await usableSession();
   if (!session) throw new Error("Cloud session is not available. Sign out and sign in again.");
   emitState("syncing");
+  await flushPendingCloudWrites().catch(() => undefined);
   const entries = syncableLocalEntries();
   await upsertRows(entries);
+  await createCloudBackupInternal("manual-upload").catch(() => undefined);
   emitState("connected");
   return verifyCloudConnection();
 }
@@ -368,10 +696,7 @@ export async function restoreAllCloudDataToLocal(): Promise<CloudDiagnostics> {
   if (!session) throw new Error("Cloud session is not available. Sign out and sign in again.");
   emitState("syncing");
   const rows = await fetchCloudRows();
-  for (const row of rows) {
-    window.localStorage.setItem(row.storage_key, JSON.stringify(row.value));
-    window.dispatchEvent(new CustomEvent(STORAGE_UPDATED_EVENT, { detail: { key: row.storage_key } }));
-  }
+  for (const row of rows) applyCloudValue(row.storage_key, row.value, row.updated_at || "");
   window.dispatchEvent(new CustomEvent(CLOUD_SYNCED_EVENT));
   emitState("connected");
   return verifyCloudConnection();
@@ -379,7 +704,37 @@ export async function restoreAllCloudDataToLocal(): Promise<CloudDiagnostics> {
 
 export async function synchronizeCloudNow(): Promise<CloudDiagnostics> {
   emitState("syncing");
-  await hydrateCloudStorage();
+  await flushPendingCloudWrites().catch(() => undefined);
+  await safeMergeCloudStorage();
+  await ensureDailyCloudBackup();
+  emitState("connected");
+  return verifyCloudConnection();
+}
+
+export async function createCloudBackup(reason = "manual"): Promise<CloudBackupSummary> {
+  emitState("syncing");
+  await flushPendingCloudWrites().catch(() => undefined);
+  const backup = await createCloudBackupInternal(reason);
+  emitState("connected");
+  return backup;
+}
+
+export async function restoreCloudBackup(backupId: string): Promise<CloudDiagnostics> {
+  if (!backupId) throw new Error("Select a backup to restore.");
+  emitState("syncing");
+  const response = await cloudRequest(`/rest/v1/a3_app_backups?id=eq.${encodeURIComponent(backupId)}&select=id,payload&limit=1`, { method: "GET" });
+  if (!response.ok) throw new Error((await response.text().catch(() => "")) || "Cloud backup could not be loaded.");
+  const rows = (await response.json()) as Array<{ id: string; payload?: Record<string, unknown> }>;
+  const payload = rows[0]?.payload;
+  if (!payload || typeof payload !== "object") throw new Error("This backup does not contain restorable records.");
+  const entries = Object.entries(payload).filter(([key]) => isSyncableKey(key));
+  for (const [key, value] of entries) {
+    window.localStorage.setItem(key, JSON.stringify(value));
+    markLocalMutation(key);
+    window.dispatchEvent(new CustomEvent(STORAGE_UPDATED_EVENT, { detail: { key } }));
+  }
+  await upsertRows(entries);
+  window.dispatchEvent(new CustomEvent(CLOUD_SYNCED_EVENT));
   emitState("connected");
   return verifyCloudConnection();
 }
@@ -389,7 +744,8 @@ export function downloadLocalDataBackup(): void {
   const storage = Object.fromEntries(syncableLocalEntries());
   const backup = {
     application: "A3 Finance",
-    version: 21,
+    version: APP_VERSION,
+    deviceId: getDeviceId(),
     exportedAt: new Date().toISOString(),
     storage,
   };
@@ -404,7 +760,57 @@ export function downloadLocalDataBackup(): void {
   URL.revokeObjectURL(url);
 }
 
+export async function importLocalDataBackup(file: File): Promise<number> {
+  const text = await file.text();
+  const parsed = JSON.parse(text) as { application?: string; storage?: Record<string, unknown> };
+  if (parsed.application !== "A3 Finance" || !parsed.storage || typeof parsed.storage !== "object") {
+    throw new Error("This file is not a valid A3 Finance backup.");
+  }
+  const entries = Object.entries(parsed.storage).filter(([key]) => isSyncableKey(key));
+  for (const [key, value] of entries) {
+    window.localStorage.setItem(key, JSON.stringify(value));
+    markLocalMutation(key);
+    window.dispatchEvent(new CustomEvent(STORAGE_UPDATED_EVENT, { detail: { key } }));
+  }
+  window.dispatchEvent(new CustomEvent(CLOUD_SYNCED_EVENT));
+  return entries.length;
+}
+
+export function startCloudAutoSync(intervalMs = AUTO_SYNC_INTERVAL_MS): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  let stopped = false;
+  const run = async () => {
+    if (stopped || autoSyncRunning || document.visibilityState === "hidden" || !navigator.onLine || !restoreSession()) return;
+    autoSyncRunning = true;
+    try {
+      await synchronizeCloudNow();
+    } catch {
+      // State is already surfaced by the cloud status indicator.
+    } finally {
+      autoSyncRunning = false;
+    }
+  };
+  const onOnline = () => void run();
+  const onFocus = () => void run();
+  const onVisibility = () => { if (document.visibilityState === "visible") void run(); };
+  const onPageHide = () => { void flushPendingCloudWrites().catch(() => undefined); };
+  const timer = window.setInterval(() => void run(), Math.max(30_000, intervalMs));
+  window.addEventListener("online", onOnline);
+  window.addEventListener("focus", onFocus);
+  window.addEventListener("pagehide", onPageHide);
+  document.addEventListener("visibilitychange", onVisibility);
+  return () => {
+    stopped = true;
+    window.clearInterval(timer);
+    window.removeEventListener("online", onOnline);
+    window.removeEventListener("focus", onFocus);
+    window.removeEventListener("pagehide", onPageHide);
+    document.removeEventListener("visibilitychange", onVisibility);
+  };
+}
+
 export async function signOutCloud(): Promise<void> {
+  await flushPendingCloudWrites().catch(() => undefined);
   const session = await usableSession();
   if (session) {
     await fetch(`${SUPABASE_URL}/auth/v1/logout`, { method: "POST", headers: authHeaders(session.access_token) }).catch(() => undefined);

@@ -1,6 +1,6 @@
 {
-  "name": "a3-finance-v27-complete",
-  "version": "2.7.0",
+  "name": "a3-management-recreated",
+  "version": "2.4.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

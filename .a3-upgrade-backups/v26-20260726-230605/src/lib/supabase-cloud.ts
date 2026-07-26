@@ -60,8 +60,8 @@ const CONFLICT_HISTORY_KEY = "a3-cloud-conflicts-v22";
 const DEVICE_ID_KEY = "a3-cloud-device-v22";
 const FIRST_SYNC_BACKUP_KEY = "a3-cloud-first-sync-backup-v22";
 const AUDIT_QUEUE_KEY = "a3-cloud-audit-queue-v23";
-const APP_VERSION = 27;
-const AUTO_SYNC_INTERVAL_MS = 30_000;
+const APP_VERSION = 23;
+const AUTO_SYNC_INTERVAL_MS = 90_000;
 const LOCAL_ONLY_KEYS = new Set([
   "a3-user-access",
   SYNC_META_KEY,

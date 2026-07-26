@@ -28,7 +28,7 @@ export const LOGIN_SESSION_KEY = "a3-login-session-v1";
 export const MINIMUM_PASSWORD_LENGTH = 6;
 export const DEFAULT_ADMIN_USERNAME = "admin";
 export const DEFAULT_ADMIN_PASSWORD = "admin123";
-export const CURRENT_PERMISSION_REVISION = 6;
+export const CURRENT_PERMISSION_REVISION = 5;
 
 export const ACCESS_MODULES: AccessModule[] = [
   { id: "overview", label: "Executive Overview", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
@@ -208,8 +208,6 @@ export function normalizeUserRecords(value: unknown): UserAccessRecord[] {
     ...selectedAdmin,
     id: DEFAULT_ADMIN_USER.id,
     username: DEFAULT_ADMIN_USERNAME,
-    email: DEFAULT_ADMIN_USER.email,
-    password: DEFAULT_ADMIN_PASSWORD,
     role: "ADMIN",
     accessScope: "ALL_INFORMATION",
     visibleModules: [...DEFAULT_ADMIN_USER.visibleModules],

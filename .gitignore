@@ -8,3 +8,4 @@ node_modules/
 .DS_Store
 
 # Local/private deployment state
+.a3-upgrade-backups/

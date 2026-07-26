@@ -1,4 +1,4 @@
-export type AccessRole = "ADMIN" | "COMPANY_ADMIN" | "DRIVER";
+﻿export type AccessRole = "ADMIN" | "COMPANY_ADMIN" | "DRIVER";
 export type AccessScope = "ALL_INFORMATION" | "SELECTED_COMPANY" | "SELECTED_MODULES" | "OWN_RECORDS";
 
 export type UserAccessRecord = {
@@ -28,7 +28,7 @@ export const LOGIN_SESSION_KEY = "a3-login-session-v1";
 export const MINIMUM_PASSWORD_LENGTH = 6;
 export const DEFAULT_ADMIN_USERNAME = "admin";
 export const DEFAULT_ADMIN_PASSWORD = "admin123";
-export const CURRENT_PERMISSION_REVISION = 5;
+export const CURRENT_PERMISSION_REVISION = 7;
 
 export const ACCESS_MODULES: AccessModule[] = [
   { id: "overview", label: "Executive Overview", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
@@ -74,9 +74,9 @@ const legacyModuleAliases: Record<string, string[]> = {
   "Platform Earnings": ["platform"],
   "Platform Earning": ["platform"],
   Invoice: ["invoice"],
-  "Invoice · EN / 中文 A4": ["invoice"],
+  "Invoice Â· EN / ä¸­æ–‡ A4": ["invoice"],
   Quotation: ["quotation"],
-  "Quotation · EN / 中文 A4": ["quotation"],
+  "Quotation Â· EN / ä¸­æ–‡ A4": ["quotation"],
   "GST Reports": ["reports"],
   "Income / Expense / P&L": ["reports"],
   "Profit & Loss": ["reports"],
@@ -208,8 +208,13 @@ export function normalizeUserRecords(value: unknown): UserAccessRecord[] {
     ...selectedAdmin,
     id: DEFAULT_ADMIN_USER.id,
     username: DEFAULT_ADMIN_USERNAME,
+    name: selectedAdmin.name || DEFAULT_ADMIN_USER.name,
+    email: DEFAULT_ADMIN_USER.email,
+    password: DEFAULT_ADMIN_PASSWORD,
     role: "ADMIN",
     accessScope: "ALL_INFORMATION",
+    companyId: selectedAdmin.companyId || "",
+    driverId: selectedAdmin.driverId || "",
     visibleModules: [...DEFAULT_ADMIN_USER.visibleModules],
     permissionRevision: CURRENT_PERMISSION_REVISION,
     status: "Active",
@@ -243,3 +248,4 @@ export function visibleModuleIdsForUser(user: UserAccessRecord): Set<string> {
 export function moduleLabels(ids: string[]): string[] {
   return ids.map(id => moduleById.get(id)?.label).filter((label): label is string => Boolean(label));
 }
+

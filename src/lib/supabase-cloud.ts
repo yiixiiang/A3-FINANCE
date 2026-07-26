@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 export type CloudSyncState = "disabled" | "signed-out" | "connecting" | "syncing" | "connected" | "error";
 
@@ -60,10 +60,9 @@ const CONFLICT_HISTORY_KEY = "a3-cloud-conflicts-v22";
 const DEVICE_ID_KEY = "a3-cloud-device-v22";
 const FIRST_SYNC_BACKUP_KEY = "a3-cloud-first-sync-backup-v22";
 const AUDIT_QUEUE_KEY = "a3-cloud-audit-queue-v23";
-const APP_VERSION = 23;
-const AUTO_SYNC_INTERVAL_MS = 90_000;
+const APP_VERSION = 26;
+const AUTO_SYNC_INTERVAL_MS = 30_000;
 const LOCAL_ONLY_KEYS = new Set([
-  "a3-user-access",
   SYNC_META_KEY,
   CONFLICT_HISTORY_KEY,
   DEVICE_ID_KEY,
@@ -925,6 +924,10 @@ export function startCloudAutoSync(intervalMs = AUTO_SYNC_INTERVAL_MS): () => vo
   };
 }
 
+export async function getCloudAccessToken(): Promise<string> {
+  const session = await usableSession();
+  return session?.access_token || "";
+}
 export async function signOutCloud(): Promise<void> {
   await flushPendingCloudWrites().catch(() => undefined);
   await flushPendingAuditEvents().catch(() => undefined);
@@ -935,3 +938,4 @@ export async function signOutCloud(): Promise<void> {
   persistSession(null);
   emitState("signed-out");
 }
+

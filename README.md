@@ -22,3 +22,29 @@ npm run dev
 ## Vercel
 Create repository secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`, then push to `main`.
 You may instead use Vercel's native Git integration and disable the included workflow to avoid duplicate deployments.
+
+
+## Finance additions
+
+- Expense records support receipt image/PDF upload and preview.
+- Platform Earnings tracks gross sales, platform fees, GST deductions, net earnings and settlement status for LIMOUSINE.A3GROUP.SG, SAKURA.A3GROUP.SG and FOOD.A3GROUP.SG.
+- Demo persistence uses browser localStorage; production should move attachments to object storage.
+
+
+## Unified Rate Management
+
+The administrator sidebar combines Vehicle Rate, Driver Fix Rate, and Client Fix Rate under one **Rate Management** workspace with dedicated tabs.
+
+## Loading and performance
+
+- Core overview/booking screens load separately from administration, finance, driver and document workspaces.
+- Browser demonstration data writes are coalesced and deferred until the main thread is idle.
+- Run `npm run typecheck` before deployment.
+- Source archives should exclude `node_modules`, `.next` and `.git`; install dependencies with `npm ci` after extraction.
+
+## User access verification
+
+- User Access assignments now control the actual sidebar modules.
+- Use the **Access preview** selector in the top bar to test an active user.
+- The User Access table and edit form show the exact modules assigned to each account.
+- Existing records that used the older labels such as `Booking`, `Rates`, or `GST Reports` are migrated automatically.

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 export type CloudSyncState = "disabled" | "signed-out" | "connecting" | "syncing" | "connected" | "error";
 
@@ -63,7 +63,6 @@ const AUDIT_QUEUE_KEY = "a3-cloud-audit-queue-v23";
 const APP_VERSION = 27;
 const AUTO_SYNC_INTERVAL_MS = 30_000;
 const LOCAL_ONLY_KEYS = new Set([
-  "a3-user-access",
   SYNC_META_KEY,
   CONFLICT_HISTORY_KEY,
   DEVICE_ID_KEY,
@@ -935,3 +934,4 @@ export async function signOutCloud(): Promise<void> {
   persistSession(null);
   emitState("signed-out");
 }
+

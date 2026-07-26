@@ -16,6 +16,9 @@ export type CloudDiagnostics = {
   backupTableReady: boolean;
   backupCount: number;
   latestBackupAt: string;
+  auditTableReady: boolean;
+  auditCount: number;
+  latestAuditAt: string;
 };
 
 export type CloudBackupSummary = {
@@ -24,6 +27,15 @@ export type CloudBackupSummary = {
   reason: string;
   keyCount: number;
   deviceId: string;
+};
+
+export type CloudAuditEntry = {
+  id: string;
+  createdAt: string;
+  action: string;
+  storageKey: string;
+  deviceId: string;
+  details: Record<string, unknown>;
 };
 
 export type CloudConflict = {
@@ -47,7 +59,8 @@ const SYNC_META_KEY = "a3-cloud-sync-meta-v22";
 const CONFLICT_HISTORY_KEY = "a3-cloud-conflicts-v22";
 const DEVICE_ID_KEY = "a3-cloud-device-v22";
 const FIRST_SYNC_BACKUP_KEY = "a3-cloud-first-sync-backup-v22";
-const APP_VERSION = 22;
+const AUDIT_QUEUE_KEY = "a3-cloud-audit-queue-v23";
+const APP_VERSION = 23;
 const AUTO_SYNC_INTERVAL_MS = 90_000;
 const LOCAL_ONLY_KEYS = new Set([
   "a3-user-access",
@@ -55,6 +68,7 @@ const LOCAL_ONLY_KEYS = new Set([
   CONFLICT_HISTORY_KEY,
   DEVICE_ID_KEY,
   FIRST_SYNC_BACKUP_KEY,
+  AUDIT_QUEUE_KEY,
 ]);
 
 function isSyncableKey(key: string): boolean {
@@ -91,6 +105,24 @@ type CloudBackupRow = {
   key_count: number;
   device_id?: string;
   payload?: Record<string, unknown>;
+};
+
+type CloudAuditRow = {
+  id: string;
+  created_at: string;
+  action: string;
+  storage_key: string;
+  device_id?: string;
+  details?: Record<string, unknown>;
+};
+
+type PendingAuditEvent = {
+  created_at: string;
+  action: string;
+  storage_key: string;
+  device_id: string;
+  app_version: number;
+  details: Record<string, unknown>;
 };
 
 type KeySyncMeta = {
@@ -288,6 +320,28 @@ function recordConflict(storageKey: string, localUpdatedAt: string, cloudUpdated
   writeJson(CONFLICT_HISTORY_KEY, [conflict, ...readConflicts()].slice(0, 30));
 }
 
+function readAuditQueue(): PendingAuditEvent[] {
+  const queue = readJson<PendingAuditEvent[]>(AUDIT_QUEUE_KEY, []);
+  return Array.isArray(queue) ? queue.slice(-200) : [];
+}
+
+function writeAuditQueue(queue: PendingAuditEvent[]): void {
+  writeJson(AUDIT_QUEUE_KEY, queue.slice(-200));
+}
+
+export function queueCloudAudit(action: string, storageKey: string, details: Record<string, unknown> = {}): void {
+  if (typeof window === "undefined" || !isSyncableKey(storageKey)) return;
+  const entry: PendingAuditEvent = {
+    created_at: new Date().toISOString(),
+    action: action || "save",
+    storage_key: storageKey,
+    device_id: getDeviceId(),
+    app_version: APP_VERSION,
+    details,
+  };
+  writeAuditQueue([...readAuditQueue(), entry]);
+}
+
 async function cloudRequest(path: string, init: RequestInit = {}, retry = true): Promise<Response> {
   const session = await usableSession();
   if (!session) throw new Error("Cloud session is not available.");
@@ -326,6 +380,7 @@ async function upsertRows(entries: Array<[string, unknown]>): Promise<void> {
   }
   meta.lastSyncAt = now;
   writeSyncMeta(meta);
+  await flushPendingAuditEvents().catch(() => undefined);
 }
 
 async function fetchCloudRows(): Promise<CloudStorageRow[]> {
@@ -348,6 +403,36 @@ async function fetchBackupRows(includePayload = false): Promise<{ ready: boolean
   }
   const rows = (await response.json()) as CloudBackupRow[];
   return { ready: true, rows: Array.isArray(rows) ? rows : [] };
+}
+
+async function fetchAuditRows(limit = 50): Promise<{ ready: boolean; rows: CloudAuditRow[] }> {
+  const response = await cloudRequest(`/rest/v1/a3_app_audit?select=id,created_at,action,storage_key,device_id,details&order=created_at.desc&limit=${Math.max(1, Math.min(200, limit))}`, { method: "GET" });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    if (response.status === 404 || /a3_app_audit|relation .* does not exist/i.test(detail)) return { ready: false, rows: [] };
+    throw new Error(detail || `Cloud audit check failed (${response.status}).`);
+  }
+  const rows = (await response.json()) as CloudAuditRow[];
+  return { ready: true, rows: Array.isArray(rows) ? rows : [] };
+}
+
+async function flushPendingAuditEvents(): Promise<void> {
+  const queue = readAuditQueue();
+  if (!queue.length) return;
+  const session = await usableSession();
+  if (!session) return;
+  const rows = queue.map(item => ({ ...item, user_id: session.user.id }));
+  const response = await cloudRequest("/rest/v1/a3_app_audit", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify(rows),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    if (response.status === 404 || /a3_app_audit|relation .* does not exist/i.test(detail)) return;
+    throw new Error(detail || `Cloud audit save failed (${response.status}).`);
+  }
+  writeAuditQueue([]);
 }
 
 async function createCloudBackupInternal(reason: string, entries = syncableLocalEntries()): Promise<CloudBackupSummary> {
@@ -526,6 +611,30 @@ export async function listCloudBackups(): Promise<{ ready: boolean; backups: Clo
   };
 }
 
+export async function listCloudAudit(limit = 50): Promise<{ ready: boolean; entries: CloudAuditEntry[] }> {
+  if (!isSupabaseConfigured()) return { ready: false, entries: [] };
+  const session = await usableSession();
+  if (!session) return { ready: false, entries: [] };
+  await flushPendingAuditEvents().catch(() => undefined);
+  const { ready, rows } = await fetchAuditRows(limit);
+  return {
+    ready,
+    entries: rows.map(row => ({
+      id: row.id,
+      createdAt: row.created_at,
+      action: row.action,
+      storageKey: row.storage_key,
+      deviceId: row.device_id || "",
+      details: row.details || {},
+    })),
+  };
+}
+
+export async function clearCloudAuditHistory(): Promise<void> {
+  const response = await cloudRequest("/rest/v1/a3_app_audit", { method: "DELETE" });
+  if (!response.ok) throw new Error((await response.text().catch(() => "")) || "Cloud audit history could not be cleared.");
+}
+
 export async function verifyCloudConnection(): Promise<CloudDiagnostics> {
   const inventory = getLocalCloudInventory();
   const configured = isSupabaseConfigured();
@@ -540,15 +649,16 @@ export async function verifyCloudConnection(): Promise<CloudDiagnostics> {
   };
   if (!configured) {
     emitState("disabled");
-    return { configured: false, signedIn: false, email: "", cloudKeyCount: 0, backupTableReady: false, backupCount: 0, latestBackupAt: "", ...base };
+    return { configured: false, signedIn: false, email: "", cloudKeyCount: 0, backupTableReady: false, backupCount: 0, latestBackupAt: "", auditTableReady: false, auditCount: 0, latestAuditAt: "", ...base };
   }
   if (!session) {
     emitState("signed-out", "Cloud session is not available. Sign out and sign in again to reconnect.");
-    return { configured: true, signedIn: false, email: "", cloudKeyCount: 0, backupTableReady: false, backupCount: 0, latestBackupAt: "", ...base };
+    return { configured: true, signedIn: false, email: "", cloudKeyCount: 0, backupTableReady: false, backupCount: 0, latestBackupAt: "", auditTableReady: false, auditCount: 0, latestAuditAt: "", ...base };
   }
   emitState("connecting");
   try {
-    const [rows, backupResult] = await Promise.all([fetchCloudRows(), fetchBackupRows(false)]);
+    await flushPendingAuditEvents().catch(() => undefined);
+    const [rows, backupResult, auditResult] = await Promise.all([fetchCloudRows(), fetchBackupRows(false), fetchAuditRows(50)]);
     emitState("connected");
     return {
       configured: true,
@@ -558,6 +668,9 @@ export async function verifyCloudConnection(): Promise<CloudDiagnostics> {
       backupTableReady: backupResult.ready,
       backupCount: backupResult.rows.length,
       latestBackupAt: backupResult.rows[0]?.created_at || "",
+      auditTableReady: auditResult.ready,
+      auditCount: auditResult.rows.length,
+      latestAuditAt: auditResult.rows[0]?.created_at || "",
       ...base,
       lastSyncAt: readSyncMeta().lastSyncAt,
       pendingWriteCount: pendingCloudWrites.size,
@@ -611,6 +724,7 @@ export async function signInAndHydrateCloud(email: string, password: string): Pr
     emitState("syncing");
     await safeMergeCloudStorage();
     await ensureDailyCloudBackup();
+    await flushPendingAuditEvents().catch(() => undefined);
     emitState("connected");
     return { ok: true, message: created ? "Cloud account created and connected." : "Supabase connected.", created };
   } catch (error) {
@@ -668,6 +782,7 @@ export async function resumeCloudSession(): Promise<{ ok: boolean; message: stri
   try {
     await safeMergeCloudStorage();
     await ensureDailyCloudBackup();
+    await flushPendingAuditEvents().catch(() => undefined);
     emitState("connected");
     return { ok: true, message: "Cloud session restored and synchronized." };
   } catch (error) {
@@ -707,6 +822,7 @@ export async function synchronizeCloudNow(): Promise<CloudDiagnostics> {
   await flushPendingCloudWrites().catch(() => undefined);
   await safeMergeCloudStorage();
   await ensureDailyCloudBackup();
+  await flushPendingAuditEvents().catch(() => undefined);
   emitState("connected");
   return verifyCloudConnection();
 }
@@ -811,6 +927,7 @@ export function startCloudAutoSync(intervalMs = AUTO_SYNC_INTERVAL_MS): () => vo
 
 export async function signOutCloud(): Promise<void> {
   await flushPendingCloudWrites().catch(() => undefined);
+  await flushPendingAuditEvents().catch(() => undefined);
   const session = await usableSession();
   if (session) {
     await fetch(`${SUPABASE_URL}/auth/v1/logout`, { method: "POST", headers: authHeaders(session.access_token) }).catch(() => undefined);

@@ -10,3 +10,7 @@ The application is split to keep the first screen responsive:
 - `src/app`: Next.js routing, metadata, global styles and Speed Insights.
 
 Production integrations should replace demonstration data with a database/API layer, object storage for attachments and server-side role enforcement.
+
+## V23 cloud audit
+
+`browser-storage.ts` records save metadata into a local audit queue. `supabase-cloud.ts` uploads queued entries to `a3_app_audit` after authenticated writes or synchronization. Supabase RLS limits each user to their own audit entries. The Cloud & Backup module lists, exports, and clears the authenticated user's audit history.

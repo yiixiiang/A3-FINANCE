@@ -19,3 +19,19 @@ order by tablename, policyname;
 
 select
   exists(select 1 from pg_trigger where tgname = 'a3_app_storage_touch_updated_at') as storage_update_trigger_ready;
+
+-- V23 audit verification
+select
+  c.relname as table_name,
+  c.relrowsecurity as rls_enabled
+from pg_class c
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relname in ('a3_app_storage', 'a3_app_backups', 'a3_app_audit')
+order by c.relname;
+
+select policyname, tablename, cmd
+from pg_policies
+where schemaname = 'public'
+  and tablename in ('a3_app_storage', 'a3_app_backups', 'a3_app_audit')
+order by tablename, policyname;

@@ -1,4 +1,4 @@
-import { queueCloudWrite } from "@/lib/supabase-cloud";
+import { queueCloudAudit, queueCloudWrite } from "@/lib/supabase-cloud";
 
 type IdleCallback = (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void;
 type BrowserWindow = Window & {
@@ -16,9 +16,11 @@ function notifyStorageUpdated(key: string): void {
   window.dispatchEvent(new CustomEvent(STORAGE_UPDATED_EVENT, { detail: { key } }));
 }
 
-function writeEntry(key: string, value: unknown, immediateCloud = false): void {
+function writeEntry(key: string, value: unknown, immediateCloud = false, auditAction = "autosave"): void {
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    const serialized = JSON.stringify(value);
+    window.localStorage.setItem(key, serialized);
+    queueCloudAudit(auditAction, key, { bytes: new Blob([serialized]).size });
     queueCloudWrite(key, value, immediateCloud);
   } catch {
     // Storage can be unavailable or full. Keep the UI responsive and allow
@@ -31,7 +33,7 @@ function flushPendingWrites(): void {
   flushScheduled = false;
   const entries = Array.from(pendingWrites.entries());
   pendingWrites.clear();
-  for (const [key, value] of entries) writeEntry(key, value);
+  for (const [key, value] of entries) writeEntry(key, value, false, "autosave");
 }
 
 function installLifecycleHooks(): void {
@@ -78,6 +80,6 @@ export function save(key: string, value: unknown): void {
 export function saveNow(key: string, value: unknown): void {
   if (typeof window === "undefined") return;
   pendingWrites.delete(key);
-  writeEntry(key, value, true);
+  writeEntry(key, value, true, "save");
   notifyStorageUpdated(key);
 }

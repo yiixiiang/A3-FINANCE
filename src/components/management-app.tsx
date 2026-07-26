@@ -1,12 +1,12 @@
 "use client";
 import dynamic from "next/dynamic";
 import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { LayoutDashboard, CarFront, UtensilsCrossed, WalletCards, Percent, Network, Settings2, BarChart3, ReceiptText, FileText, Search, Bell, Menu, X, ChevronRight, Plus, TrendingUp, Users, Clock3, ShieldCheck, Globe2, Banknote, LogOut, Database, CloudUpload, CloudDownload, RefreshCw, HardDriveDownload, CheckCircle2, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, CarFront, UtensilsCrossed, WalletCards, Percent, Network, Settings2, BarChart3, ReceiptText, FileText, Search, Bell, Menu, X, ChevronRight, Plus, TrendingUp, Users, Clock3, ShieldCheck, Globe2, Banknote, LogOut, Database, CloudUpload, CloudDownload, RefreshCw, HardDriveDownload, CheckCircle2, AlertTriangle, History, Download, Trash2 } from "lucide-react";
 import { bookings } from "@/lib/data";
 import { load, saveNow, STORAGE_UPDATED_EVENT } from "@/lib/browser-storage";
 import { DRIVER_STORAGE_KEY, EXPENSE_STORAGE_KEY, INCOME_STORAGE_KEY, INVOICE_STORAGE_KEY, QUOTATION_STORAGE_KEY, calculateDocumentTotals, defaultDocumentRecords, defaultDriverOverviewRecords, defaultExpenseOverviewRecords, defaultIncomeOverviewRecords, normalizeDocumentRecords, type StoredDriverRecord, type StoredExpenseRecord, type StoredIncomeRecord } from "@/lib/finance-records";
 import { DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_USER, LOGIN_SESSION_KEY, USER_ACCESS_STORAGE_KEY, USER_ACCESS_UPDATED_EVENT, normalizeUserRecords, roleLabel, visibleModuleIdsForUser, type UserAccessRecord } from "@/lib/access-control";
-import { CLOUD_SYNC_STATE_EVENT, clearCloudConflictHistory, createCloudBackup, downloadLocalDataBackup, getCloudConflictHistory, getCloudSyncSnapshot, importLocalDataBackup, listCloudBackups, resumeCloudSession, restoreAllCloudDataToLocal, restoreCloudBackup, signInAndHydrateCloud, signOutCloud, startCloudAutoSync, synchronizeCloudNow, uploadAllLocalDataToCloud, verifyCloudConnection, type CloudBackupSummary, type CloudDiagnostics, type CloudSyncState } from "@/lib/supabase-cloud";
+import { CLOUD_SYNC_STATE_EVENT, clearCloudAuditHistory, clearCloudConflictHistory, createCloudBackup, downloadLocalDataBackup, getCloudConflictHistory, getCloudSyncSnapshot, importLocalDataBackup, listCloudAudit, listCloudBackups, resumeCloudSession, restoreAllCloudDataToLocal, restoreCloudBackup, signInAndHydrateCloud, signOutCloud, startCloudAutoSync, synchronizeCloudNow, uploadAllLocalDataToCloud, verifyCloudConnection, type CloudAuditEntry, type CloudBackupSummary, type CloudDiagnostics, type CloudSyncState } from "@/lib/supabase-cloud";
 
 type Item={id:string;label:string;icon:any};
 const nav: {label:string;items:Item[]}[]=[
@@ -170,6 +170,8 @@ function CloudCenter(){
  const [snapshot,setSnapshot]=useState(()=>getCloudSyncSnapshot());
  const [diagnostics,setDiagnostics]=useState<CloudDiagnostics|null>(null);
  const [backups,setBackups]=useState<CloudBackupSummary[]>([]);
+ const [auditEntries,setAuditEntries]=useState<CloudAuditEntry[]>([]);
+ const [auditReady,setAuditReady]=useState(false);
  const [conflicts,setConflicts]=useState(()=>getCloudConflictHistory());
  const [busy,setBusy]=useState("");
  const [notice,setNotice]=useState("");
@@ -179,6 +181,7 @@ function CloudCenter(){
   setSnapshot(getCloudSyncSnapshot());
   setConflicts(getCloudConflictHistory());
   try{const result=await listCloudBackups();setBackups(result.backups);}catch{setBackups([]);}
+  try{const result=await listCloudAudit(50);setAuditReady(result.ready);setAuditEntries(result.entries);}catch{setAuditReady(false);setAuditEntries([]);}
  };
  useEffect(()=>{
   const refresh=()=>{setSnapshot(getCloudSyncSnapshot());setConflicts(getCloudConflictHistory());};
@@ -218,6 +221,20 @@ function CloudCenter(){
   catch(reason){setError(reason instanceof Error?reason.message:"Backup import failed.");}
   finally{setBusy("");await refreshDetails();}
  };
+ const exportAudit=()=>{
+  if(!auditEntries.length)return;
+  const escape=(value:unknown)=>`"${String(value??"").replaceAll('"','""')}"`;
+  const rows=[["Date","Action","Storage key","Device","Bytes"],...auditEntries.map(item=>[item.createdAt,item.action,item.storageKey,item.deviceId,String(item.details.bytes??"")])];
+  const blob=new Blob([rows.map(row=>row.map(escape).join(",")).join("\n")],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download=`A3-Audit-${new Date().toISOString().slice(0,10)}.csv`;document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+ };
+ const clearAudit=async()=>{
+  if(!window.confirm("Clear your Supabase audit history? This cannot be undone."))return;
+  setBusy("clear-audit");setNotice("");setError("");
+  try{await clearCloudAuditHistory();setAuditEntries([]);setNotice("Cloud audit history cleared.");setDiagnostics(await verifyCloudConnection());}
+  catch(reason){setError(reason instanceof Error?reason.message:"Audit history could not be cleared.");}
+  finally{setBusy("");await refreshDetails();}
+ };
  const size=diagnostics?diagnostics.localBytes<1024?`${diagnostics.localBytes} B`:diagnostics.localBytes<1048576?`${(diagnostics.localBytes/1024).toFixed(1)} KB`:`${(diagnostics.localBytes/1048576).toFixed(2)} MB`:"—";
  const lastSync=diagnostics?.lastSyncAt||snapshot.lastSyncAt;
  return <><Heading eyebrow="SUPABASE · MULTI-DEVICE SAFETY" title="Cloud & Backup" copy="Synchronize safely between computers, review conflicts, and keep automatic cloud backups before data is replaced."/>
@@ -228,6 +245,7 @@ function CloudCenter(){
   <div className="cloudmetric"><span>Pending saves</span><strong>{diagnostics?.pendingWriteCount??snapshot.pendingWriteCount}</strong><small>Automatically retried</small></div>
   <div className="cloudmetric"><span>Conflict history</span><strong>{diagnostics?.conflictCount??conflicts.length}</strong><small>Newest value kept</small></div>
   <div className="cloudmetric"><span>Cloud backups</span><strong>{diagnostics?.backupCount??backups.length}</strong><small>{diagnostics?.latestBackupAt?new Date(diagnostics.latestBackupAt).toLocaleDateString("en-SG"):diagnostics?.backupTableReady===false?"Run latest SQL schema":"Daily + manual"}</small></div>
+  <div className="cloudmetric"><span>Audit events</span><strong>{diagnostics?.auditCount??auditEntries.length}</strong><small>{diagnostics?.latestAuditAt?new Date(diagnostics.latestAuditAt).toLocaleString("en-SG"):diagnostics?.auditTableReady===false?"Run V23 SQL upgrade":"Save activity history"}</small></div>
  </div>
  {(notice||error)&&<div className={error?"cloudnotice error":"cloudnotice success"}>{error||notice}</div>}
  <div className="cloudactiongrid cloudactiongrid-v22">
@@ -241,7 +259,8 @@ function CloudCenter(){
   <div className="panel cloudbackups"><div className="panelhead"><div><span>SERVER-SIDE HISTORY</span><h2>Recent cloud backups</h2></div></div>{backups.length?<div className="cloudbackuplist">{backups.slice(0,10).map(backup=><div key={backup.id}><div><strong>{new Date(backup.createdAt).toLocaleString("en-SG")}</strong><span>{backup.reason.replaceAll("-"," ")} · {backup.keyCount} groups</span></div><button className="ghost" disabled={Boolean(busy)} onClick={()=>void restoreBackup(backup)}>{busy===`restore-${backup.id}`?"Restoring…":"Restore"}</button></div>)}</div>:<div className="empty compact"><p>{diagnostics?.backupTableReady===false?"Run the latest supabase/schema.sql to enable cloud backup history.":"No cloud backups yet."}</p></div>}</div>
   <div className="panel cloudconflicts"><div className="panelhead"><div><span>MULTI-DEVICE AUDIT</span><h2>Conflict history</h2></div>{conflicts.length>0&&<button className="ghost" onClick={()=>{clearCloudConflictHistory();setConflicts([])}}>Clear history</button>}</div>{conflicts.length?<div className="cloudconflictlist">{conflicts.slice(0,10).map(item=><div key={item.id}><strong>{item.storageKey}</strong><span>{new Date(item.detectedAt).toLocaleString("en-SG")} · kept {item.resolution==="cloud-first-sync"?"cloud on first sync":item.resolution}</span></div>)}</div>:<div className="empty compact"><p>No conflicting changes detected.</p></div>}</div>
  </div>
- <div className="panel cloudchecklist"><div className="panelhead"><div><span>V22 DATABASE UPGRADE</span><h2>Activation order</h2></div></div><ol><li>Run the latest <strong>supabase/schema.sql</strong> to add secure backup history.</li><li>Redeploy V22 so Vercel uses the updated cloud synchronization code.</li><li>Sign out and sign in once, then open this page.</li><li>Use <strong>Verify connection</strong> and confirm the backup table shows ready.</li><li>Create one manual cloud backup before using a second computer.</li></ol>{diagnostics?.checkedAt&&<small>Last checked: {new Date(diagnostics.checkedAt).toLocaleString("en-SG")}</small>}</div></>;
+ <div className="panel cloudaudit"><div className="panelhead"><div><span>V23 CHANGE HISTORY</span><h2>Recent cloud activity</h2></div><div className="rowactions"><button className="ghost" disabled={!auditEntries.length} onClick={exportAudit}><Download size={14}/>Export CSV</button><button className="ghost danger" disabled={!auditEntries.length||Boolean(busy)} onClick={()=>void clearAudit()}><Trash2 size={14}/>{busy==="clear-audit"?"Clearing…":"Clear"}</button></div></div>{auditEntries.length?<div className="cloudauditlist">{auditEntries.slice(0,20).map(item=><div key={item.id}><span className={`auditaction audit-${item.action}`}>{item.action}</span><div><strong>{item.storageKey}</strong><small>{new Date(item.createdAt).toLocaleString("en-SG")} · {item.deviceId||"Unknown device"}{item.details.bytes?` · ${Number(item.details.bytes).toLocaleString("en-SG")} bytes`:""}</small></div></div>)}</div>:<div className="empty compact"><History size={30}/><p>{auditReady?"No save activity recorded yet.":"Run the V23 Supabase SQL upgrade to enable audit history."}</p></div>}</div>
+ <div className="panel cloudchecklist"><div className="panelhead"><div><span>V23 DATABASE UPGRADE</span><h2>Activation order</h2></div></div><ol><li>Run <strong>supabase/v23-upgrade.sql</strong> to add the secure audit table.</li><li>Deploy V23 so save activity starts recording.</li><li>Sign out and sign in once, then open this page.</li><li>Use <strong>Verify connection</strong> and confirm backup and audit tables are ready.</li><li>Edit and save one record, click <strong>Sync now</strong>, and confirm it appears above.</li></ol>{diagnostics?.checkedAt&&<small>Last checked: {new Date(diagnostics.checkedAt).toLocaleString("en-SG")}</small>}</div></>;
 }
 
 function NoModuleAccess({user}:{user:UserAccessRecord}){return <div className="panel empty accessdenied"><ShieldCheck size={38}/><h2>{user.status==="Suspended"?"User access suspended":"No modules assigned"}</h2><p>{user.status==="Suspended"?`${user.name} is suspended and cannot open any workspace.`:`${user.name} does not currently have permission to view a module. Ask an administrator to update the user in User Access.`}</p></div>}

@@ -60,3 +60,7 @@ Administrators can open **Fleet & Settings → Cloud & Backup** to verify Supaba
 ## V22 Multi-Device Sync Safety
 
 V22 adds timestamp-aware Supabase merging, automatic online/focus synchronization, pending-save and conflict diagnostics, daily server-side backups, manual backup restore, and portable JSON backup import. Run `08-OPEN-V22-SQL-UPGRADE.cmd` before deploying with `09-DEPLOY-V22-SYNC-SAFETY.cmd`.
+
+## V23 Cloud Audit & Activity History
+
+V23 records save activity in the secure Supabase `a3_app_audit` table and shows recent changes in **Fleet & Settings → Cloud & Backup**. Run `11-OPEN-V23-SQL-UPGRADE.cmd`, then deploy with `12-DEPLOY-V23-AUDIT.cmd`.

@@ -28,7 +28,7 @@ export const LOGIN_SESSION_KEY = "a3-login-session-v1";
 export const MINIMUM_PASSWORD_LENGTH = 6;
 export const DEFAULT_ADMIN_USERNAME = "admin";
 export const DEFAULT_ADMIN_PASSWORD = "admin123";
-export const CURRENT_PERMISSION_REVISION = 4;
+export const CURRENT_PERMISSION_REVISION = 5;
 
 export const ACCESS_MODULES: AccessModule[] = [
   { id: "overview", label: "Executive Overview", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
@@ -44,6 +44,7 @@ export const ACCESS_MODULES: AccessModule[] = [
   { id: "drivers", label: "Driver Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "catalogue", label: "Website Catalogue Rate", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "company", label: "Company Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
+  { id: "cloud", label: "Cloud & Backup", roles: ["ADMIN"] },
   { id: "income", label: "Income", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "expenses", label: "Expense", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "platform", label: "Platform Earning", roles: ["ADMIN", "COMPANY_ADMIN"] },
@@ -81,6 +82,8 @@ const legacyModuleAliases: Record<string, string[]> = {
   "Profit & Loss": ["reports"],
   "Balance Sheet": ["balancesheet"],
   "Company Management": ["company"],
+  "Cloud & Backup": ["cloud"],
+  Cloud: ["cloud"],
   "User Access": ["access"],
   "User Management": ["access"],
   Access: ["access"],
@@ -155,7 +158,7 @@ export function normalizeUserRecord(value: Partial<Omit<UserAccessRecord, "role"
   const storedPermissionRevision = Number(value.permissionRevision) || 0;
   const isExistingRecord = typeof value.id === "string" && Boolean(value.id);
   const migrationModules: Record<AccessRole, string[]> = {
-    ADMIN: ["clientsetup", "income", "access", "driverclaims", "balancesheet"],
+    ADMIN: ["clientsetup", "income", "access", "driverclaims", "balancesheet", "cloud"],
     COMPANY_ADMIN: ["clientsetup", "income", "driverclaims", "balancesheet"],
     DRIVER: ["driverclaims"],
   };

@@ -2,6 +2,16 @@
 
 export type CloudSyncState = "disabled" | "signed-out" | "connecting" | "syncing" | "connected" | "error";
 
+export type CloudDiagnostics = {
+  configured: boolean;
+  signedIn: boolean;
+  email: string;
+  localKeyCount: number;
+  cloudKeyCount: number;
+  localBytes: number;
+  checkedAt: string;
+};
+
 export const CLOUD_SYNC_STATE_EVENT = "a3-cloud-sync-state";
 export const CLOUD_SYNCED_EVENT = "a3-cloud-storage-hydrated";
 
@@ -186,6 +196,41 @@ export function getCloudSyncSnapshot(): { state: CloudSyncState; error: string; 
   return { state, error: lastError, email: session?.user.email || "" };
 }
 
+export function getLocalCloudInventory(): { keyCount: number; bytes: number } {
+  if (typeof window === "undefined") return { keyCount: 0, bytes: 0 };
+  let bytes = 0;
+  let keyCount = 0;
+  for (const [key, value] of syncableLocalEntries()) {
+    keyCount += 1;
+    bytes += new Blob([key, JSON.stringify(value)]).size;
+  }
+  return { keyCount, bytes };
+}
+
+export async function verifyCloudConnection(): Promise<CloudDiagnostics> {
+  const inventory = getLocalCloudInventory();
+  const configured = isSupabaseConfigured();
+  const session = configured ? await usableSession() : null;
+  if (!configured) {
+    emitState("disabled");
+    return { configured: false, signedIn: false, email: "", localKeyCount: inventory.keyCount, cloudKeyCount: 0, localBytes: inventory.bytes, checkedAt: new Date().toISOString() };
+  }
+  if (!session) {
+    emitState("signed-out", "Cloud session is not available. Sign out and sign in again to reconnect.");
+    return { configured: true, signedIn: false, email: "", localKeyCount: inventory.keyCount, cloudKeyCount: 0, localBytes: inventory.bytes, checkedAt: new Date().toISOString() };
+  }
+  emitState("connecting");
+  try {
+    const rows = await fetchCloudRows();
+    emitState("connected");
+    return { configured: true, signedIn: true, email: session.user.email || "", localKeyCount: inventory.keyCount, cloudKeyCount: rows.length, localBytes: inventory.bytes, checkedAt: new Date().toISOString() };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Cloud verification failed.";
+    emitState("error", message);
+    throw error;
+  }
+}
+
 export async function signInAndHydrateCloud(email: string, password: string): Promise<{ ok: boolean; message: string; created?: boolean }> {
   if (!isSupabaseConfigured()) return { ok: true, message: "Cloud sync is not configured." };
   if (!email.includes("@")) return { ok: false, message: "This user needs a valid email address before Supabase can connect." };
@@ -281,6 +326,82 @@ export function queueCloudWrite(key: string, value: unknown, immediate = false):
     return;
   }
   cloudFlushTimer = window.setTimeout(() => void flushCloudWrites(), 450);
+}
+
+
+export async function resumeCloudSession(): Promise<{ ok: boolean; message: string }> {
+  if (!isSupabaseConfigured()) {
+    emitState("disabled");
+    return { ok: false, message: "Cloud sync is not configured." };
+  }
+  const session = await usableSession();
+  if (!session) {
+    emitState("signed-out");
+    return { ok: false, message: "Cloud session is not available." };
+  }
+  emitState("syncing");
+  try {
+    await hydrateCloudStorage();
+    emitState("connected");
+    return { ok: true, message: "Cloud session restored and synchronized." };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Cloud session could not be restored.";
+    emitState("error", message);
+    return { ok: false, message };
+  }
+}
+
+export async function uploadAllLocalDataToCloud(): Promise<CloudDiagnostics> {
+  if (!isSupabaseConfigured()) throw new Error("Cloud sync is not configured.");
+  const session = await usableSession();
+  if (!session) throw new Error("Cloud session is not available. Sign out and sign in again.");
+  emitState("syncing");
+  const entries = syncableLocalEntries();
+  await upsertRows(entries);
+  emitState("connected");
+  return verifyCloudConnection();
+}
+
+export async function restoreAllCloudDataToLocal(): Promise<CloudDiagnostics> {
+  if (!isSupabaseConfigured()) throw new Error("Cloud sync is not configured.");
+  const session = await usableSession();
+  if (!session) throw new Error("Cloud session is not available. Sign out and sign in again.");
+  emitState("syncing");
+  const rows = await fetchCloudRows();
+  for (const row of rows) {
+    window.localStorage.setItem(row.storage_key, JSON.stringify(row.value));
+    window.dispatchEvent(new CustomEvent(STORAGE_UPDATED_EVENT, { detail: { key: row.storage_key } }));
+  }
+  window.dispatchEvent(new CustomEvent(CLOUD_SYNCED_EVENT));
+  emitState("connected");
+  return verifyCloudConnection();
+}
+
+export async function synchronizeCloudNow(): Promise<CloudDiagnostics> {
+  emitState("syncing");
+  await hydrateCloudStorage();
+  emitState("connected");
+  return verifyCloudConnection();
+}
+
+export function downloadLocalDataBackup(): void {
+  if (typeof window === "undefined") return;
+  const storage = Object.fromEntries(syncableLocalEntries());
+  const backup = {
+    application: "A3 Finance",
+    version: 21,
+    exportedAt: new Date().toISOString(),
+    storage,
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `A3-Finance-Backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function signOutCloud(): Promise<void> {

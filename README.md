@@ -52,3 +52,7 @@ The administrator sidebar combines Vehicle Rate, Driver Fix Rate, and Client Fix
 ## Supabase SQL cloud sync
 
 This build includes authenticated Supabase storage. Complete the steps in `SUPABASE_SETUP.md`, run `supabase/schema.sql`, add the two public environment variables to Vercel, and redeploy.
+
+## V21 Cloud & Backup
+
+Administrators can open **Fleet & Settings → Cloud & Backup** to verify Supabase, migrate local records, restore cloud records on another computer, and download a JSON backup. The saved Supabase session now resumes automatically after refreshing the page.

@@ -1,24 +1,24 @@
 "use client";
 import dynamic from "next/dynamic";
 import { memo, useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
-import { LayoutDashboard, CarFront, UtensilsCrossed, WalletCards, Percent, Network, Settings2, BarChart3, ReceiptText, FileText, Search, Bell, Menu, X, ChevronRight, Plus, TrendingUp, Users, Clock3, ShieldCheck, Globe2, Banknote, LogOut } from "lucide-react";
+import { LayoutDashboard, CarFront, UtensilsCrossed, WalletCards, Percent, Network, Settings2, BarChart3, ReceiptText, FileText, Search, Bell, Menu, X, ChevronRight, Plus, TrendingUp, Users, Clock3, ShieldCheck, Globe2, Banknote, LogOut, Database, CloudUpload, CloudDownload, RefreshCw, HardDriveDownload, CheckCircle2, AlertTriangle } from "lucide-react";
 import { bookings } from "@/lib/data";
 import { load, saveNow, STORAGE_UPDATED_EVENT } from "@/lib/browser-storage";
 import { DRIVER_STORAGE_KEY, EXPENSE_STORAGE_KEY, INCOME_STORAGE_KEY, INVOICE_STORAGE_KEY, QUOTATION_STORAGE_KEY, calculateDocumentTotals, defaultDocumentRecords, defaultDriverOverviewRecords, defaultExpenseOverviewRecords, defaultIncomeOverviewRecords, normalizeDocumentRecords, type StoredDriverRecord, type StoredExpenseRecord, type StoredIncomeRecord } from "@/lib/finance-records";
 import { DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_USER, LOGIN_SESSION_KEY, USER_ACCESS_STORAGE_KEY, USER_ACCESS_UPDATED_EVENT, normalizeUserRecords, roleLabel, visibleModuleIdsForUser, type UserAccessRecord } from "@/lib/access-control";
-import { signInAndHydrateCloud, signOutCloud } from "@/lib/supabase-cloud";
+import { CLOUD_SYNC_STATE_EVENT, downloadLocalDataBackup, getCloudSyncSnapshot, resumeCloudSession, restoreAllCloudDataToLocal, signInAndHydrateCloud, signOutCloud, synchronizeCloudNow, uploadAllLocalDataToCloud, verifyCloudConnection, type CloudDiagnostics, type CloudSyncState } from "@/lib/supabase-cloud";
 
 type Item={id:string;label:string;icon:any};
 const nav: {label:string;items:Item[]}[]=[
  {label:"Workspace",items:[{id:"overview",label:"Executive Overview",icon:LayoutDashboard}]},
  {label:"Booking",items:[{id:"limousine",label:"Website Limousine Bookings",icon:CarFront},{id:"sakura",label:"Website Sakura Table Bookings",icon:UtensilsCrossed}]},
  {label:"Driver",items:[{id:"payout",label:"Driver Report Payout",icon:WalletCards},{id:"rebate",label:"Driver 10% Rebate",icon:Percent},{id:"network",label:"Driver Network",icon:Network},{id:"driversignup",label:"Driver Sign-Up / Profile",icon:Users},{id:"driverclaims",label:"Driver Claims",icon:ReceiptText}]},
- {label:"Fleet & Settings",items:[{id:"ratemanagement",label:"Rate Management",icon:Settings2},{id:"clientsetup",label:"Client Management",icon:Users},{id:"drivers",label:"Driver Management",icon:Users},{id:"catalogue",label:"Website Catalogue Rate",icon:Globe2},{id:"company",label:"Company Management",icon:Settings2},{id:"access",label:"User Access",icon:ShieldCheck}]},
+ {label:"Fleet & Settings",items:[{id:"ratemanagement",label:"Rate Management",icon:Settings2},{id:"clientsetup",label:"Client Management",icon:Users},{id:"drivers",label:"Driver Management",icon:Users},{id:"catalogue",label:"Website Catalogue Rate",icon:Globe2},{id:"company",label:"Company Management",icon:Settings2},{id:"cloud",label:"Cloud & Backup",icon:Database},{id:"access",label:"User Access",icon:ShieldCheck}]},
  {label:"Report",items:[{id:"income",label:"Income",icon:TrendingUp},{id:"expenses",label:"Expense",icon:ReceiptText},{id:"platform",label:"Platform Earning",icon:Banknote},{id:"invoice",label:"Invoice",icon:ReceiptText},{id:"quotation",label:"Quotation",icon:FileText},{id:"reports",label:"Profit & Loss",icon:BarChart3},{id:"balancesheet",label:"Balance Sheet",icon:WalletCards}]}
 ];
 const moneyFormatter=new Intl.NumberFormat("en-SG",{style:"currency",currency:"SGD",minimumFractionDigits:2,maximumFractionDigits:2});
 const money=(n:number)=>moneyFormatter.format(n);
-const corePages=new Set(["overview","limousine","sakura"]);
+const corePages=new Set(["overview","limousine","sakura","cloud"]);
 const defaultUsers=[{...DEFAULT_ADMIN_USER,visibleModules:[...DEFAULT_ADMIN_USER.visibleModules]}];
 const ManagementModules=dynamic(()=>import("./management-modules").then(module=>module.ManagementModules),{ssr:false,loading:ModuleLoading});
 
@@ -52,6 +52,11 @@ export function ManagementApp(){
    setSignedInUserId("");
   }
  },[authReady,signedInUserId,users]);
+
+ useEffect(()=>{
+  if(!authReady||!signedInUserId)return;
+  void resumeCloudSession();
+ },[authReady,signedInUserId]);
 
  const currentUser=users.find(user=>user.id===signedInUserId);
  const accessUser=currentUser??DEFAULT_ADMIN_USER;
@@ -89,8 +94,11 @@ export function ManagementApp(){
 
   if(!user)return "Incorrect username/email or password.";
   if(user.status!=="Active")return "This user account is suspended.";
-  const cloudResult=await signInAndHydrateCloud(user.email,password);
-  if(!cloudResult.ok)return cloudResult.message;
+  // A valid A3 account must never be locked out just because Supabase is
+  // unconfigured, awaiting email confirmation, or temporarily unavailable.
+  // Cloud authentication runs first so existing cloud records can hydrate,
+  // but any cloud error remains a non-blocking status warning in the header.
+  await signInAndHydrateCloud(user.email,password);
 
   const hydratedUsers=normalizeUserRecords(load(USER_ACCESS_STORAGE_KEY,users));
   setUsers(hydratedUsers);
@@ -126,14 +134,26 @@ export function ManagementApp(){
    <div className="sidebarfoot"><span>Connected services</span><div><i></i> Supabase SQL sync</div><div><i></i> Vercel production</div></div>
   </aside>
   <main>
-   <header>{isNavigating&&<span className="routeprogress" aria-label="Loading section"/>}<button className="menu" aria-label="Open navigation" aria-expanded={mobile} onClick={()=>setMobile(true)}><Menu/></button><div className="search searchglobal"><Search size={18}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search all information..."/>{query.trim().length>=2&&<div className="globalsearchresults">{searchResults.length?searchResults.map(result=><button key={result.id} onClick={()=>{selectPage(result.moduleId);setQuery("")}}><strong>{result.title}</strong><span>{result.detail}</span></button>):<div className="globalsearchempty">No matching information</div>}</div>}</div><button className="iconbtn" aria-label="Notifications"><Bell size={19}/><b></b></button><div className="signedinuser"><span>{currentUser.username}</span><strong>{roleLabel(currentUser.role)}</strong></div><div className="avatar" title={currentUser.email}>{initials}</div><button className="logoutbtn" onClick={signOut}><LogOut size={16}/><span>Sign out</span></button></header>
+   <header>{isNavigating&&<span className="routeprogress" aria-label="Loading section"/>}<button className="menu" aria-label="Open navigation" aria-expanded={mobile} onClick={()=>setMobile(true)}><Menu/></button><div className="search searchglobal"><Search size={18}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search all information..."/>{query.trim().length>=2&&<div className="globalsearchresults">{searchResults.length?searchResults.map(result=><button key={result.id} onClick={()=>{selectPage(result.moduleId);setQuery("")}}><strong>{result.title}</strong><span>{result.detail}</span></button>):<div className="globalsearchempty">No matching information</div>}</div>}</div><CloudStatus/><button className="iconbtn" aria-label="Notifications"><Bell size={19}/><b></b></button><div className="signedinuser"><span>{currentUser.username}</span><strong>{roleLabel(currentUser.role)}</strong></div><div className="avatar" title={currentUser.email}>{initials}</div><button className="logoutbtn" onClick={signOut}><LogOut size={16}/><span>Sign out</span></button></header>
    <section className="content">
     {!canViewActive&&<NoModuleAccess user={currentUser}/>} 
-    {canViewActive&&active==="overview"&&<Overview role={roleLabel(currentUser.role)}/>} {canViewActive&&active==="limousine"&&<Bookings query={deferredQuery}/>} {canViewActive&&active==="sakura"&&<Sakura/>}
+    {canViewActive&&active==="overview"&&<Overview role={roleLabel(currentUser.role)}/>} {canViewActive&&active==="limousine"&&<Bookings query={deferredQuery}/>} {canViewActive&&active==="sakura"&&<Sakura/>} {canViewActive&&active==="cloud"&&<CloudCenter/>}
     {canViewActive&&!corePages.has(active)&&<ManagementModules active={active} user={currentUser}/>} 
    </section>
   </main>
  </div>
+}
+
+function CloudStatus(){
+ const [snapshot,setSnapshot]=useState(()=>getCloudSyncSnapshot());
+ useEffect(()=>{
+  const refresh=()=>setSnapshot(getCloudSyncSnapshot());
+  refresh();
+  window.addEventListener(CLOUD_SYNC_STATE_EVENT,refresh);
+  return()=>window.removeEventListener(CLOUD_SYNC_STATE_EVENT,refresh);
+ },[]);
+ const labels:Record<CloudSyncState,string>={disabled:"Cloud not configured","signed-out":"Cloud signed out",connecting:"Cloud connecting",syncing:"Cloud syncing",connected:"Cloud connected",error:"Cloud error"};
+ return <div className={`cloudstatus cloud-${snapshot.state}`} title={snapshot.error||snapshot.email||labels[snapshot.state]}><i/><span>{labels[snapshot.state]}</span></div>;
 }
 
 function LoginPage({onLogin}:{onLogin:(identifier:string,password:string)=>Promise<string>}){
@@ -142,7 +162,47 @@ function LoginPage({onLogin}:{onLogin:(identifier:string,password:string)=>Promi
  const [error,setError]=useState("");
  const [submitting,setSubmitting]=useState(false);
  const submit=async(event:React.FormEvent<HTMLFormElement>)=>{event.preventDefault();setSubmitting(true);setError("");const message=await onLogin(identifier,password);setError(message);setSubmitting(false)};
- return <main className="loginpage"><section className="logincard"><div className="loginbrand"><div className="brandmark">A3</div><div><strong>A3 MANAGEMENT</strong><span>Business Operating System</span></div></div><div className="loginintro"><span>SUPABASE SQL ACCESS</span><h1>Sign in</h1><p>Your A3 user email and password also secure the Supabase cloud records.</p></div>{error&&<div className="formerror" role="alert">{error}</div>}<form onSubmit={submit}><label>Username or email<input autoFocus autoComplete="username" value={identifier} onChange={event=>setIdentifier(event.target.value)} placeholder="Username or email" required disabled={submitting}/></label><label>Password<input type="password" autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} placeholder="Password" required disabled={submitting}/></label><button className="primary loginbutton" type="submit" disabled={submitting}>{submitting?"Connecting to Supabase…":"Sign in"}</button></form><p className="loginhint">Initial administrator login: <strong>{DEFAULT_ADMIN_USERNAME}</strong> / <strong>{DEFAULT_ADMIN_PASSWORD}</strong>. Run <strong>supabase/schema.sql</strong> before the first cloud login.</p></section></main>
+ return <main className="loginpage"><section className="logincard"><div className="loginbrand"><div className="brandmark">A3</div><div><strong>A3 MANAGEMENT</strong><span>Business Operating System</span></div></div><div className="loginintro"><span>A3 SECURE ACCESS</span><h1>Sign in</h1><p>Use your A3 username or email. The system remains accessible even while Supabase cloud setup is incomplete.</p></div>{error&&<div className="formerror" role="alert">{error}</div>}<form onSubmit={submit}><label>Username or email<input autoFocus autoComplete="username" value={identifier} onChange={event=>setIdentifier(event.target.value)} placeholder="Username or email" required disabled={submitting}/></label><label>Password<input type="password" autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} placeholder="Password" required disabled={submitting}/></label><button className="primary loginbutton" type="submit" disabled={submitting}>{submitting?"Signing in…":"Sign in"}</button></form><p className="loginhint">Initial administrator login: <strong>{DEFAULT_ADMIN_USERNAME}</strong> / <strong>{DEFAULT_ADMIN_PASSWORD}</strong>. Run <strong>supabase/schema.sql</strong> before the first cloud login.</p></section></main>
+}
+
+function CloudCenter(){
+ const [snapshot,setSnapshot]=useState(()=>getCloudSyncSnapshot());
+ const [diagnostics,setDiagnostics]=useState<CloudDiagnostics|null>(null);
+ const [busy,setBusy]=useState("");
+ const [notice,setNotice]=useState("");
+ const [error,setError]=useState("");
+ useEffect(()=>{
+  const refresh=()=>setSnapshot(getCloudSyncSnapshot());
+  window.addEventListener(CLOUD_SYNC_STATE_EVENT,refresh);
+  void run("verify",false);
+  return()=>window.removeEventListener(CLOUD_SYNC_STATE_EVENT,refresh);
+ },[]);
+ const run=async(action:"verify"|"sync"|"upload"|"restore",confirmAction=true)=>{
+  if(confirmAction&&action==="upload"&&!window.confirm("Upload all saved records from this computer to Supabase? Existing cloud keys with the same name will be updated."))return;
+  if(confirmAction&&action==="restore"&&!window.confirm("Restore all Supabase records to this computer? Cloud values will replace matching local records."))return;
+  setBusy(action);setNotice("");setError("");
+  try{
+   const result=action==="verify"?await verifyCloudConnection():action==="sync"?await synchronizeCloudNow():action==="upload"?await uploadAllLocalDataToCloud():await restoreAllCloudDataToLocal();
+   setDiagnostics(result);
+   setNotice(action==="verify"?"Connection check completed.":action==="sync"?"Local and cloud records synchronized.":action==="upload"?"This computer's records were uploaded to Supabase.":"Cloud records were restored to this computer.");
+  }catch(reason){setError(reason instanceof Error?reason.message:"Cloud operation failed.");}
+  finally{setBusy("");setSnapshot(getCloudSyncSnapshot());}
+ };
+ const size=diagnostics?diagnostics.localBytes<1024?`${diagnostics.localBytes} B`:diagnostics.localBytes<1048576?`${(diagnostics.localBytes/1024).toFixed(1)} KB`:`${(diagnostics.localBytes/1048576).toFixed(2)} MB`:"—";
+ return <><Heading eyebrow="SUPABASE · CLOUD STORAGE" title="Cloud & Backup" copy="Verify Supabase, synchronize saved business records, and keep a downloadable backup before moving data between computers."/>
+ <div className="cloudsummary">
+  <div className={`cloudhero cloudhero-${snapshot.state}`}><div><span>CONNECTION</span><h2>{snapshot.state==="connected"?"Supabase connected":snapshot.state==="syncing"?"Synchronizing records":snapshot.state==="connecting"?"Checking connection":snapshot.state==="disabled"?"Supabase not configured":"Cloud attention required"}</h2><p>{snapshot.error||snapshot.email||"Use Verify connection to test the current Supabase session."}</p></div>{snapshot.state==="connected"?<CheckCircle2 size={38}/>:<AlertTriangle size={38}/>}</div>
+  <div className="cloudmetric"><span>Local storage keys</span><strong>{diagnostics?.localKeyCount??"—"}</strong><small>{size}</small></div>
+  <div className="cloudmetric"><span>Cloud storage keys</span><strong>{diagnostics?.cloudKeyCount??"—"}</strong><small>{diagnostics?.email||snapshot.email||"Not signed in"}</small></div>
+ </div>
+ {(notice||error)&&<div className={error?"cloudnotice error":"cloudnotice success"}>{error||notice}</div>}
+ <div className="cloudactiongrid">
+  <section><RefreshCw size={25}/><h3>Verify and synchronize</h3><p>Checks the authenticated Supabase session and safely merges available records.</p><div><button className="primary" disabled={Boolean(busy)} onClick={()=>void run("verify")}>{busy==="verify"?"Checking…":"Verify connection"}</button><button className="ghost" disabled={Boolean(busy)} onClick={()=>void run("sync")}>{busy==="sync"?"Syncing…":"Sync now"}</button></div></section>
+  <section><CloudUpload size={25}/><h3>Upload this computer</h3><p>Pushes every syncable A3 record saved in this browser to the signed-in Supabase account.</p><button className="primary" disabled={Boolean(busy)} onClick={()=>void run("upload")}>{busy==="upload"?"Uploading…":"Upload local records"}</button></section>
+  <section><CloudDownload size={25}/><h3>Restore from Supabase</h3><p>Downloads cloud values and replaces matching records on this computer. Other local-only records are kept.</p><button className="primary" disabled={Boolean(busy)} onClick={()=>void run("restore")}>{busy==="restore"?"Restoring…":"Restore cloud records"}</button></section>
+  <section><HardDriveDownload size={25}/><h3>Download local backup</h3><p>Creates a JSON backup of the current browser records before a migration or major update.</p><button className="ghost" onClick={downloadLocalDataBackup}>Download backup</button></section>
+ </div>
+ <div className="panel cloudchecklist"><div className="panelhead"><div><span>FIRST-TIME CLOUD CHECKLIST</span><h2>Activation order</h2></div></div><ol><li>Run <strong>supabase/schema.sql</strong> in the Supabase SQL Editor.</li><li>Confirm the matching user exists in Supabase Authentication and is email-confirmed.</li><li>Add both Supabase environment variables to Vercel, then redeploy production.</li><li>Sign out and sign in once to establish the cloud session.</li><li>Open this page and use <strong>Verify connection</strong>, then <strong>Upload local records</strong>.</li></ol>{diagnostics?.checkedAt&&<small>Last checked: {new Date(diagnostics.checkedAt).toLocaleString("en-SG")}</small>}</div></>;
 }
 
 function NoModuleAccess({user}:{user:UserAccessRecord}){return <div className="panel empty accessdenied"><ShieldCheck size={38}/><h2>{user.status==="Suspended"?"User access suspended":"No modules assigned"}</h2><p>{user.status==="Suspended"?`${user.name} is suspended and cannot open any workspace.`:`${user.name} does not currently have permission to view a module. Ask an administrator to update the user in User Access.`}</p></div>}

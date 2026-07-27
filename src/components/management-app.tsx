@@ -6,7 +6,7 @@ import { bookings } from "@/lib/data";
 import { load, saveNow, STORAGE_UPDATED_EVENT } from "@/lib/browser-storage";
 import { DRIVER_STORAGE_KEY, EXPENSE_STORAGE_KEY, INCOME_STORAGE_KEY, INVOICE_STORAGE_KEY, QUOTATION_STORAGE_KEY, calculateDocumentTotals, defaultDocumentRecords, defaultDriverOverviewRecords, defaultExpenseOverviewRecords, defaultIncomeOverviewRecords, normalizeDocumentRecords, type StoredDriverRecord, type StoredExpenseRecord, type StoredIncomeRecord } from "@/lib/finance-records";
 import { DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_USER, LOGIN_SESSION_KEY, USER_ACCESS_STORAGE_KEY, USER_ACCESS_UPDATED_EVENT, normalizeUserRecords, roleLabel, visibleModuleIdsForUser, type UserAccessRecord } from "@/lib/access-control";
-import { CLOUD_SYNC_STATE_EVENT, clearCloudAuditHistory, clearCloudConflictHistory, createCloudBackup, downloadLocalDataBackup, getCloudConflictHistory, getCloudSyncSnapshot, importLocalDataBackup, listCloudAudit, listCloudBackups, resumeCloudSession, restoreAllCloudDataToLocal, restoreCloudBackup, signInAndHydrateCloud, signOutCloud, startCloudAutoSync, synchronizeCloudNow, uploadAllLocalDataToCloud, verifyCloudConnection, type CloudAuditEntry, type CloudBackupSummary, type CloudDiagnostics, type CloudSyncState } from "@/lib/supabase-cloud";
+import { CLOUD_SYNC_STATE_EVENT, clearCloudAuditHistory, clearCloudConflictHistory, createCloudBackup, downloadLocalDataBackup, getCloudConflictHistory, getCloudSyncSnapshot, importLocalDataBackup, listCloudAudit, listCloudBackups, resumeCloudSession, restoreAllCloudDataToLocal, restoreCloudBackup, signOutCloud, startCloudAutoSync, synchronizeCloudNow, uploadAllLocalDataToCloud, verifyCloudConnection, type CloudAuditEntry, type CloudBackupSummary, type CloudDiagnostics, type CloudSyncState } from "@/lib/supabase-cloud";
 
 type Item={id:string;label:string;icon:any};
 const nav: {label:string;items:Item[]}[]=[
@@ -95,11 +95,8 @@ export function ManagementApp(){
 
   if(!user)return "Incorrect username/email or password.";
   if(user.status!=="Active")return "This user account is suspended.";
-  // A valid A3 account must never be locked out just because Supabase is
-  // unconfigured, awaiting email confirmation, or temporarily unavailable.
-  // Cloud authentication runs first so existing cloud records can hydrate,
-  // but any cloud error remains a non-blocking status warning in the header.
-  await signInAndHydrateCloud(user.email,password);
+  // Cloud sync is handled by the server after local login.
+  void resumeCloudSession();
 
   const hydratedUsers=normalizeUserRecords(load(USER_ACCESS_STORAGE_KEY,users));
   setUsers(hydratedUsers);
@@ -130,7 +127,7 @@ export function ManagementApp(){
 
  return <div className={mobile?"shell menu-open":"shell"} aria-busy={isNavigating}>
   <button className={mobile?"sidebarbackdrop show":"sidebarbackdrop"} aria-label="Close navigation" onClick={()=>setMobile(false)}/><aside className={mobile?"sidebar open":"sidebar"} aria-label="Main navigation">
-   <div className="brand"><div className="brandmark">A3</div><div><strong>A3 MANAGEMENT</strong><span>Business Operating System</span></div><button className="close" aria-label="Close navigation" onClick={()=>setMobile(false)}><X/></button></div>
+   <div className="brand"><img className="brandlogo" src="/brand/a3-group-sg-logo.png" alt="A3 Group SG"/><div><strong>A3 MANAGEMENT</strong><span>Business Operating System</span></div><button className="close" aria-label="Close navigation" onClick={()=>setMobile(false)}><X/></button></div>
    <nav>{allowed.length?allowed.map(group=><div className="navgroup" key={group.label}><p>{group.label}</p>{group.items.map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?"navitem active":"navitem"} onClick={()=>selectPage(item.id)}><Icon size={17}/><span>{item.label}</span><ChevronRight size={15}/></button>})}</div>):<div className="navempty"><ShieldCheck size={20}/><strong>No modules assigned</strong><span>Ask an administrator to update this user.</span></div>}</nav>
    <div className="sidebarfoot"><span>Connected services</span><div><i></i> Supabase SQL sync</div><div><i></i> Vercel production</div></div>
   </aside>
@@ -163,7 +160,7 @@ function LoginPage({onLogin}:{onLogin:(identifier:string,password:string)=>Promi
  const [error,setError]=useState("");
  const [submitting,setSubmitting]=useState(false);
  const submit=async(event:React.FormEvent<HTMLFormElement>)=>{event.preventDefault();setSubmitting(true);setError("");const message=await onLogin(identifier,password);setError(message);setSubmitting(false)};
- return <main className="loginpage"><section className="logincard"><div className="loginbrand"><div className="brandmark">A3</div><div><strong>A3 MANAGEMENT</strong><span>Business Operating System</span></div></div><div className="loginintro"><span>A3 SECURE ACCESS</span><h1>Sign in</h1><p>Use your A3 username or email. The system remains accessible even while Supabase cloud setup is incomplete.</p></div>{error&&<div className="formerror" role="alert">{error}</div>}<form onSubmit={submit}><label>Username or email<input autoFocus autoComplete="username" value={identifier} onChange={event=>setIdentifier(event.target.value)} placeholder="Username or email" required disabled={submitting}/></label><label>Password<input type="password" autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} placeholder="Password" required disabled={submitting}/></label><button className="primary loginbutton" type="submit" disabled={submitting}>{submitting?"Signing in…":"Sign in"}</button></form><p className="loginhint">Initial administrator login: <strong>{DEFAULT_ADMIN_USERNAME}</strong> / <strong>{DEFAULT_ADMIN_PASSWORD}</strong>. Run <strong>supabase/schema.sql</strong> before the first cloud login.</p></section></main>
+ return <main className="loginpage"><section className="logincard"><div className="loginbrand"><img className="loginbrandlogo" src="/brand/a3-group-sg-logo.png" alt="A3 Group SG"/><div><strong>A3 MANAGEMENT</strong><span>Business Operating System</span></div></div><div className="loginintro"><span>A3 SECURE ACCESS</span><h1>Sign in</h1><p>Use your A3 username or email. The system remains accessible even while Supabase cloud setup is incomplete.</p></div>{error&&<div className="formerror" role="alert">{error}</div>}<form onSubmit={submit}><label>Username or email<input autoFocus autoComplete="username" value={identifier} onChange={event=>setIdentifier(event.target.value)} placeholder="Username or email" required disabled={submitting}/></label><label>Password<input type="password" autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} placeholder="Password" required disabled={submitting}/></label><button className="primary loginbutton" type="submit" disabled={submitting}>{submitting?"Signing in…":"Sign in"}</button></form><p className="loginhint">Use your assigned A3 account credentials. Contact the primary administrator if you cannot sign in.</p></section></main>
 }
 
 function CloudCenter(){
@@ -189,6 +186,7 @@ function CloudCenter(){
   void (async()=>{try{setDiagnostics(await verifyCloudConnection());}catch{}await refreshDetails();})();
   return()=>window.removeEventListener(CLOUD_SYNC_STATE_EVENT,refresh);
  },[]);
+
  const run=async(action:"verify"|"sync"|"upload"|"restore"|"backup",confirmAction=true)=>{
   if(confirmAction&&action==="upload"&&!window.confirm("Upload all saved records from this computer to Supabase? Existing cloud keys with the same name will be updated."))return;
   if(confirmAction&&action==="restore"&&!window.confirm("Restore all Supabase records to this computer? Cloud values will replace matching local records."))return;
@@ -248,6 +246,7 @@ function CloudCenter(){
   <div className="cloudmetric"><span>Audit events</span><strong>{diagnostics?.auditCount??auditEntries.length}</strong><small>{diagnostics?.latestAuditAt?new Date(diagnostics.latestAuditAt).toLocaleString("en-SG"):diagnostics?.auditTableReady===false?"Run V23 SQL upgrade":"Save activity history"}</small></div>
  </div>
  {(notice||error)&&<div className={error?"cloudnotice error":"cloudnotice success"}>{error||notice}</div>}
+ 
  <div className="cloudactiongrid cloudactiongrid-v22">
   <section><RefreshCw size={25}/><h3>Verify and synchronize</h3><p>Checks the authenticated session, compares update times, preserves conflicts, and merges the newest records.</p><div><button className="primary" disabled={Boolean(busy)} onClick={()=>void run("verify")}>{busy==="verify"?"Checking…":"Verify connection"}</button><button className="ghost" disabled={Boolean(busy)} onClick={()=>void run("sync")}>{busy==="sync"?"Syncing…":"Sync now"}</button></div></section>
   <section><CloudUpload size={25}/><h3>Upload this computer</h3><p>Uses this computer as the source for all matching cloud record groups and creates a safety backup.</p><button className="primary" disabled={Boolean(busy)} onClick={()=>void run("upload")}>{busy==="upload"?"Uploading…":"Upload local records"}</button></section>
@@ -260,7 +259,7 @@ function CloudCenter(){
   <div className="panel cloudconflicts"><div className="panelhead"><div><span>MULTI-DEVICE AUDIT</span><h2>Conflict history</h2></div>{conflicts.length>0&&<button className="ghost" onClick={()=>{clearCloudConflictHistory();setConflicts([])}}>Clear history</button>}</div>{conflicts.length?<div className="cloudconflictlist">{conflicts.slice(0,10).map(item=><div key={item.id}><strong>{item.storageKey}</strong><span>{new Date(item.detectedAt).toLocaleString("en-SG")} · kept {item.resolution==="cloud-first-sync"?"cloud on first sync":item.resolution}</span></div>)}</div>:<div className="empty compact"><p>No conflicting changes detected.</p></div>}</div>
  </div>
  <div className="panel cloudaudit"><div className="panelhead"><div><span>V23 CHANGE HISTORY</span><h2>Recent cloud activity</h2></div><div className="rowactions"><button className="ghost" disabled={!auditEntries.length} onClick={exportAudit}><Download size={14}/>Export CSV</button><button className="ghost danger" disabled={!auditEntries.length||Boolean(busy)} onClick={()=>void clearAudit()}><Trash2 size={14}/>{busy==="clear-audit"?"Clearing…":"Clear"}</button></div></div>{auditEntries.length?<div className="cloudauditlist">{auditEntries.slice(0,20).map(item=><div key={item.id}><span className={`auditaction audit-${item.action}`}>{item.action}</span><div><strong>{item.storageKey}</strong><small>{new Date(item.createdAt).toLocaleString("en-SG")} · {item.deviceId||"Unknown device"}{item.details.bytes?` · ${Number(item.details.bytes).toLocaleString("en-SG")} bytes`:""}</small></div></div>)}</div>:<div className="empty compact"><History size={30}/><p>{auditReady?"No save activity recorded yet.":"Run the V23 Supabase SQL upgrade to enable audit history."}</p></div>}</div>
- <div className="panel cloudchecklist"><div className="panelhead"><div><span>V23 DATABASE UPGRADE</span><h2>Activation order</h2></div></div><ol><li>Run <strong>supabase/v23-upgrade.sql</strong> to add the secure audit table.</li><li>Deploy V23 so save activity starts recording.</li><li>Sign out and sign in once, then open this page.</li><li>Use <strong>Verify connection</strong> and confirm backup and audit tables are ready.</li><li>Edit and save one record, click <strong>Sync now</strong>, and confirm it appears above.</li></ol>{diagnostics?.checkedAt&&<small>Last checked: {new Date(diagnostics.checkedAt).toLocaleString("en-SG")}</small>}</div></>;
+ <div className="panel cloudchecklist"><div className="panelhead"><div><span>V23 DATABASE UPGRADE</span><h2>Activation order</h2></div></div><ol><li>Run <strong>supabase/v23-upgrade.sql</strong> to add the secure audit table.</li><li>Deploy V23 so save activity starts recording.</li><li>Redeploy with the server environment variables, then open this page.</li><li>Use <strong>Verify connection</strong> and confirm backup and audit tables are ready.</li><li>Edit and save one record, click <strong>Sync now</strong>, and confirm it appears above.</li></ol>{diagnostics?.checkedAt&&<small>Last checked: {new Date(diagnostics.checkedAt).toLocaleString("en-SG")}</small>}</div></>;
 }
 
 function NoModuleAccess({user}:{user:UserAccessRecord}){return <div className="panel empty accessdenied"><ShieldCheck size={38}/><h2>{user.status==="Suspended"?"User access suspended":"No modules assigned"}</h2><p>{user.status==="Suspended"?`${user.name} is suspended and cannot open any workspace.`:`${user.name} does not currently have permission to view a module. Ask an administrator to update the user in User Access.`}</p></div>}

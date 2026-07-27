@@ -209,7 +209,7 @@ export function normalizeUserRecords(value: unknown): UserAccessRecord[] {
     id: DEFAULT_ADMIN_USER.id,
     username: DEFAULT_ADMIN_USERNAME,
     email: DEFAULT_ADMIN_USER.email,
-    password: DEFAULT_ADMIN_PASSWORD,
+    password: selectedAdmin.password || DEFAULT_ADMIN_PASSWORD,
     role: "ADMIN",
     accessScope: "ALL_INFORMATION",
     visibleModules: [...DEFAULT_ADMIN_USER.visibleModules],

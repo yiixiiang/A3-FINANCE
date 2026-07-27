@@ -1,0 +1,3 @@
+select version,name,applied_at from public.a3_schema_migrations where version between 39 and 50 order by version;
+select table_name from information_schema.tables where table_schema='public' and table_name in (
+'a3_permissions','a3_role_permissions','a3_workflow_definitions','a3_workflow_steps','a3_fixed_assets','a3_asset_depreciation','a3_inventory_items','a3_inventory_movements','a3_employees','a3_pay_runs','a3_pay_run_lines','a3_business_partners','a3_commercial_documents','a3_review_findings','a3_kpi_definitions','a3_kpi_snapshots','a3_exchange_rates','a3_consolidation_entries','a3_integration_jobs','a3_release_checks') order by table_name;

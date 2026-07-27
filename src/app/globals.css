@@ -117,3 +117,88 @@ header{overflow:hidden}.routeprogress{position:absolute;top:0;left:0;height:2px;
 
 /* V23 cloud audit and change history */
 .cloudaudit{margin-top:16px}.cloudaudit .panelhead{align-items:flex-start}.cloudaudit .rowactions{display:flex;gap:8px;flex-wrap:wrap}.cloudauditlist{display:grid;gap:8px}.cloudauditlist>div{display:grid;grid-template-columns:92px 1fr;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#f9fafb}.cloudauditlist strong{display:block;font-size:12px;overflow-wrap:anywhere}.cloudauditlist small{display:block;margin-top:3px;color:#748094;font-size:10px;overflow-wrap:anywhere}.auditaction{display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;border-radius:999px;background:#eef2f6;color:#536074;font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.audit-save{background:#edf9f2;color:#18764a}.audit-autosave{background:#eef5ff;color:#245ea8}.ghost.danger{color:#b42318;border-color:#f4c7c3}.ghost.danger:hover{background:#fff1f0}@media(max-width:700px){.cloudauditlist>div{grid-template-columns:1fr}.auditaction{justify-self:start}.cloudaudit .rowactions{width:100%}.cloudaudit .rowactions button{flex:1}}
+
+/* A3 Group SG global brand logo */
+.brandlogo{width:74px;height:74px;object-fit:contain;flex:0 0 auto;filter:drop-shadow(0 8px 16px rgba(0,0,0,.28))}
+.loginbrandlogo{width:88px;height:88px;object-fit:contain;flex:0 0 auto;filter:drop-shadow(0 10px 20px rgba(0,0,0,.2))}
+@media(max-width:760px){.brandlogo{width:58px;height:58px}.loginbrandlogo{width:72px;height:72px}}
+\n\n/* Responsive, accessibility, and rendering hardening */
+html{min-width:320px;scroll-behavior:smooth;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{min-width:320px;overflow-x:hidden}
+img,svg,video,canvas,iframe{max-width:100%}
+button,input,select,textarea{min-width:0}
+button{touch-action:manipulation}
+button,.navitem,.rowaction,.primary,.ghost,.iconbtn,.logoutbtn{min-height:42px}
+.content{width:100%}
+.panel,.metric,.cloudhero,.cloudmetric,.cloudactiongrid section{content-visibility:auto;contain-intrinsic-size:1px 260px}
+.tablewrap{width:100%;max-width:100%;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch;scrollbar-gutter:stable}
+.tablewrap:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+td,th{font-variant-numeric:tabular-nums}
+.modalbackdrop{padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+.modal{overscroll-behavior:contain}
+input,select,textarea{font-size:16px}
+@media(min-width:701px){input,select,textarea{font-size:inherit}}
+@media(max-width:1050px){
+ .sidebar{padding-top:max(18px,env(safe-area-inset-top));padding-bottom:max(18px,env(safe-area-inset-bottom))}
+ header{padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
+}
+@media(max-width:820px){
+ header{height:auto;min-height:64px;gap:8px;flex-wrap:nowrap}
+ .signedinuser{display:none}
+ .logoutbtn span{display:none}
+ .logoutbtn,.iconbtn,.menu{width:42px;min-width:42px;padding:0;display:grid;place-items:center}
+ header select{max-width:124px;padding-inline:8px}
+ .heading{margin-bottom:20px}
+ .heading .primary{width:100%;justify-content:center}
+ .panelhead{align-items:flex-start;gap:12px;flex-wrap:wrap}
+ .panelhead>.rowactions,.documenttoolbar,.modalactions{width:100%}
+ .documenttoolbar{margin-top:0;flex-wrap:wrap}
+ .documenttoolbar>*{flex:1 1 160px}
+}
+@media(max-width:700px){
+ .content{padding:18px 12px calc(24px + env(safe-area-inset-bottom))}
+ .sidebar{width:min(88vw,320px);left:min(-90vw,-330px)}
+ .brand{padding-bottom:16px}
+ .navgroup{margin-top:14px}
+ .navitem{padding:12px 10px;font-size:14px}
+ .heading h1{font-size:clamp(24px,8vw,30px);overflow-wrap:anywhere}
+ .heading p{font-size:14px;line-height:1.5}
+ .metric{padding:17px}
+ .metricicon{margin-bottom:12px}
+ .metric>strong{font-size:24px}
+ .panel{padding:15px;border-radius:14px}
+ .chart{gap:7px;padding-inline:2px}
+ .months{font-size:10px}
+ .modalbackdrop{align-items:end}
+ .modal{width:100%;max-height:min(92dvh,900px);border-radius:18px 18px 0 0;padding:18px 14px calc(18px + env(safe-area-inset-bottom))}
+ .modalhead{position:sticky;top:-18px;z-index:3;margin:-18px -14px 16px;padding:18px 14px 12px;background:#fff;border-bottom:1px solid var(--line)}
+ .modalactions{position:sticky;bottom:calc(-18px - env(safe-area-inset-bottom));z-index:3;margin:8px -14px calc(-18px - env(safe-area-inset-bottom));padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line)}
+ .modalactions>*{flex:1;justify-content:center}
+ .rowactions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .rowactions>*{justify-content:center}
+ .tablewrap{margin-inline:-15px;width:calc(100% + 30px);padding-inline:15px}
+ table{min-width:680px}
+ th,td{padding:12px 10px}
+ .receiptframe{height:65dvh}
+ .empty{padding:44px 14px}
+}
+@media(max-width:480px){
+ header select{display:none}
+ .cloudstatus{display:none}
+ .avatar{display:none}
+ .metrics{gap:12px}
+ .grid2,.grid3{gap:12px;margin-top:12px}
+ .panel{margin-top:12px}
+ .pulse{gap:9px}
+ .pulse div{padding:14px}
+ .rowactions{grid-template-columns:1fr}
+ .modalactions{flex-direction:column-reverse}
+ .modalactions>*{width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+ *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+@media print{
+ .sidebar,header,.sidebarbackdrop,.documenttoolbar,.rowactions,.modalbackdrop{display:none!important}
+ .shell{display:block}.content{max-width:none;padding:0}.panel,.metric{box-shadow:none;break-inside:avoid}
+}

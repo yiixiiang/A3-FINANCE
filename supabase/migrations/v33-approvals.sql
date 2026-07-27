@@ -1,0 +1,4 @@
+-- V33: Approval workflow
+create table if not exists public.a3_approval_requests(id uuid primary key default gen_random_uuid(),owner_id uuid not null references auth.users(id),company_id text not null,entity_type text not null,entity_id text not null,status text not null default 'PENDING' check(status in ('PENDING','APPROVED','REJECTED','CANCELLED')),requested_by uuid not null references auth.users(id),decided_by uuid references auth.users(id),request_note text default '',decision_note text default '',created_at timestamptz default now(),decided_at timestamptz);
+alter table public.a3_approval_requests enable row level security;
+drop policy if exists approval_owner_all on public.a3_approval_requests; create policy approval_owner_all on public.a3_approval_requests for all to authenticated using(owner_id=auth.uid()) with check(owner_id=auth.uid());

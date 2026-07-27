@@ -1,0 +1,5 @@
+-- V43: inventory and costing
+create table if not exists public.a3_inventory_items(id uuid primary key default gen_random_uuid(),owner_id uuid not null references auth.users(id),company_id text not null,sku text not null,description text not null,cost_method text not null default 'WEIGHTED_AVERAGE' check(cost_method in ('FIFO','WEIGHTED_AVERAGE')),active boolean not null default true,unique(owner_id,company_id,sku));
+create table if not exists public.a3_inventory_movements(id uuid primary key default gen_random_uuid(),item_id uuid not null references public.a3_inventory_items(id),warehouse text not null,movement_date timestamptz not null default now(),quantity numeric(18,4) not null,unit_cost numeric(18,4),reference_type text,reference_id text);
+alter table public.a3_inventory_items enable row level security; alter table public.a3_inventory_movements enable row level security;
+insert into public.a3_schema_migrations(version,name) values(43,'inventory and costing') on conflict(version) do update set name=excluded.name, applied_at=now();

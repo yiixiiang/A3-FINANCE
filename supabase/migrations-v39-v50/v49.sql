@@ -1,0 +1,4 @@
+-- V49: integration job queue
+create table if not exists public.a3_integration_jobs(id uuid primary key default gen_random_uuid(),owner_id uuid references auth.users(id),provider text not null,direction text not null check(direction in ('INBOUND','OUTBOUND')),job_type text not null,idempotency_key text not null,status text not null default 'PENDING',attempt_count integer not null default 0,next_attempt_at timestamptz,payload jsonb not null default '{}'::jsonb,last_error text,created_at timestamptz not null default now(),updated_at timestamptz not null default now(),unique(provider,idempotency_key));
+alter table public.a3_integration_jobs enable row level security; revoke all on public.a3_integration_jobs from anon,authenticated;
+insert into public.a3_schema_migrations(version,name) values(49,'external integrations foundation') on conflict(version) do update set name=excluded.name, applied_at=now();

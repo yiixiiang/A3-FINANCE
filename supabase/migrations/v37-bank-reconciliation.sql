@@ -1,0 +1,4 @@
+-- V37: Bank reconciliation
+create table if not exists public.a3_bank_transactions(id uuid primary key default gen_random_uuid(),owner_id uuid not null references auth.users(id),company_id text not null,bank_account text not null,transaction_date date not null,reference text,description text,amount numeric(18,2) not null,currency char(3) not null default 'SGD',import_hash text not null,reconciled boolean not null default false,matched_record_id uuid references public.a3_finance_records(id),unique(owner_id,bank_account,import_hash));
+alter table public.a3_bank_transactions enable row level security;
+drop policy if exists bank_owner_all on public.a3_bank_transactions; create policy bank_owner_all on public.a3_bank_transactions for all to authenticated using(owner_id=auth.uid()) with check(owner_id=auth.uid());

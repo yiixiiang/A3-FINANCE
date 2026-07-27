@@ -1,0 +1,5 @@
+-- V42: fixed assets
+create table if not exists public.a3_fixed_assets(id uuid primary key default gen_random_uuid(),owner_id uuid not null references auth.users(id),company_id text not null,asset_code text not null,description text not null,acquisition_date date not null,cost numeric(18,2) not null,salvage_value numeric(18,2) not null default 0,useful_life_months integer not null,status text not null default 'ACTIVE',unique(owner_id,company_id,asset_code));
+create table if not exists public.a3_asset_depreciation(id uuid primary key default gen_random_uuid(),asset_id uuid not null references public.a3_fixed_assets(id) on delete restrict,period_start date not null,amount numeric(18,2) not null,journal_id uuid references public.a3_journals(id),unique(asset_id,period_start));
+alter table public.a3_fixed_assets enable row level security; alter table public.a3_asset_depreciation enable row level security;
+insert into public.a3_schema_migrations(version,name) values(42,'fixed assets and depreciation') on conflict(version) do update set name=excluded.name, applied_at=now();

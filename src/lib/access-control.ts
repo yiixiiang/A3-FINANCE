@@ -42,7 +42,7 @@ export const ACCESS_MODULES: AccessModule[] = [
   { id: "ratemanagement", label: "Rate Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "clientsetup", label: "Client Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "drivers", label: "Driver Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
-  { id: "catalogue", label: "Website Catalogue Rate", roles: ["ADMIN", "COMPANY_ADMIN"] },
+  { id: "catalogue", label: "Website Catalogue", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "company", label: "Company Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "cloud", label: "Cloud & Backup", roles: ["ADMIN"] },
   { id: "income", label: "Income", roles: ["ADMIN", "COMPANY_ADMIN"] },

@@ -6,7 +6,7 @@ import { bookings } from "@/lib/data";
 import { load, saveNow, STORAGE_UPDATED_EVENT } from "@/lib/browser-storage";
 import { DRIVER_STORAGE_KEY, EXPENSE_STORAGE_KEY, INCOME_STORAGE_KEY, INVOICE_STORAGE_KEY, QUOTATION_STORAGE_KEY, calculateDocumentTotals, defaultDocumentRecords, defaultDriverOverviewRecords, defaultExpenseOverviewRecords, defaultIncomeOverviewRecords, normalizeDocumentRecords, type StoredDriverRecord, type StoredExpenseRecord, type StoredIncomeRecord } from "@/lib/finance-records";
 import { DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_USER, LOGIN_SESSION_KEY, USER_ACCESS_STORAGE_KEY, USER_ACCESS_UPDATED_EVENT, normalizeUserRecords, roleLabel, visibleModuleIdsForUser, type UserAccessRecord } from "@/lib/access-control";
-import { CLOUD_SYNCED_EVENT, CLOUD_SYNC_STATE_EVENT, clearCloudAuditHistory, clearCloudConflictHistory, createCloudBackup, downloadLocalDataBackup, getCloudConflictHistory, getCloudSyncSnapshot, importLocalDataBackup, listCloudAudit, listCloudBackups, resumeCloudSession, restoreAllCloudDataToLocal, restoreCloudBackup, signOutCloud, startCloudAutoSync, synchronizeCloudNow, uploadAllLocalDataToCloud, verifyCloudConnection, type CloudAuditEntry, type CloudBackupSummary, type CloudDiagnostics, type CloudSyncState } from "@/lib/supabase-cloud";
+import { CLOUD_SYNC_STATE_EVENT, clearCloudAuditHistory, clearCloudConflictHistory, createCloudBackup, downloadLocalDataBackup, getCloudConflictHistory, getCloudSyncSnapshot, importLocalDataBackup, listCloudAudit, listCloudBackups, resumeCloudSession, restoreAllCloudDataToLocal, restoreCloudBackup, signOutCloud, startCloudAutoSync, synchronizeCloudNow, uploadAllLocalDataToCloud, verifyCloudConnection, type CloudAuditEntry, type CloudBackupSummary, type CloudDiagnostics, type CloudSyncState } from "@/lib/supabase-cloud";
 
 type Item={id:string;label:string;icon:any};
 const nav: {label:string;items:Item[]}[]=[
@@ -28,7 +28,6 @@ export function ManagementApp(){
  const [authReady,setAuthReady]=useState(false);
  const [active,setActive]=useState("overview"); const [mobile,setMobile]=useState(false); const [query,setQuery]=useState("");
  const [isNavigating,startTransition]=useTransition();
- const [cloudRevision,setCloudRevision]=useState(0);
  const deferredQuery=useDeferredValue(query);
 
  useEffect(()=>{
@@ -59,8 +58,6 @@ export function ManagementApp(){
   void resumeCloudSession();
   return startCloudAutoSync();
  },[authReady,signedInUserId]);
-
- useEffect(()=>{const refresh=()=>setCloudRevision(value=>value+1);window.addEventListener(CLOUD_SYNCED_EVENT,refresh);return()=>window.removeEventListener(CLOUD_SYNCED_EVENT,refresh)},[]);
 
  const currentUser=users.find(user=>user.id===signedInUserId);
  const accessUser=currentUser??DEFAULT_ADMIN_USER;
@@ -139,7 +136,7 @@ export function ManagementApp(){
    <section className="content">
     {!canViewActive&&<NoModuleAccess user={currentUser}/>} 
     {canViewActive&&active==="overview"&&<Overview role={roleLabel(currentUser.role)}/>} {canViewActive&&active==="limousine"&&<Bookings query={deferredQuery}/>} {canViewActive&&active==="sakura"&&<Sakura/>} {canViewActive&&active==="cloud"&&<CloudCenter/>}
-    {canViewActive&&!corePages.has(active)&&<ManagementModules key={`${active}-${cloudRevision}`} active={active} user={currentUser}/>} 
+    {canViewActive&&!corePages.has(active)&&<ManagementModules active={active} user={currentUser}/>} 
    </section>
   </main>
  </div>

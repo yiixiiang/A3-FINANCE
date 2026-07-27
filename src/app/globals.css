@@ -202,3 +202,35 @@ input,select,textarea{font-size:16px}
  .sidebar,header,.sidebarbackdrop,.documenttoolbar,.rowactions,.modalbackdrop{display:none!important}
  .shell{display:block}.content{max-width:none;padding:0}.panel,.metric{box-shadow:none;break-inside:avoid}
 }
+
+/* Primary administrator password management */
+.adminpasswordpanel{margin-bottom:18px}.adminpasswordpanel .panelhead p{margin:6px 0 0;color:#667085;font-size:12px}.adminpasswordform{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:12px;align-items:end}.adminpasswordform label{display:grid;gap:6px;font-size:12px;font-weight:800;color:#344054}.adminpasswordform input{width:100%;min-height:44px}.adminpasswordform button{min-height:44px;white-space:nowrap}@media(max-width:900px){.adminpasswordform{grid-template-columns:1fr 1fr}.adminpasswordform button{width:100%}}@media(max-width:620px){.adminpasswordform{grid-template-columns:1fr}.adminpasswordpanel{padding:16px}.adminpasswordform button{width:100%}}
+
+/* Cloud authentication recovery */
+.cloudreconnect{margin:0 0 16px}.cloudreconnectform{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:12px;align-items:end}.cloudreconnectform label{display:grid;gap:6px;font-size:11px;font-weight:800;color:#536074}.cloudreconnectform input{width:100%;min-height:44px}.cloudreconnectform button{min-height:44px;white-space:nowrap}@media(max-width:760px){.cloudreconnectform{grid-template-columns:1fr}.cloudreconnectform button{width:100%}}
+
+/* v5.1 mobile editing stability */
+@media (max-width:700px){
+ html,body{scroll-behavior:auto;overscroll-behavior-y:none}
+ .content{padding-left:12px!important;padding-right:12px!important}
+ .modalbackdrop{padding:0!important;align-items:end!important}
+ .modal{max-height:94dvh!important;border-radius:18px 18px 0 0!important;padding:16px 14px calc(16px + env(safe-area-inset-bottom))!important;scroll-padding-top:82px;scroll-padding-bottom:96px}
+ .modal input,.modal select,.modal textarea{font-size:16px!important;min-height:46px}
+ .modal textarea{width:100%;min-height:100px;border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:#fff;color:var(--ink)}
+ .modalhead{top:-16px!important;margin:-16px -14px 14px!important;padding:16px 14px 12px!important}
+ .modalactions{bottom:calc(-16px - env(safe-area-inset-bottom))!important;margin:10px -14px calc(-16px - env(safe-area-inset-bottom))!important;padding:12px 14px calc(12px + env(safe-area-inset-bottom))!important;display:grid!important;grid-template-columns:1fr 1.35fr!important;flex-direction:initial!important}
+ .modalactions>*{width:100%!important;min-height:48px!important}
+ .documenttoolbar{display:grid!important;grid-template-columns:1fr!important;gap:9px!important}
+ .documenttoolbar>*{width:100%!important;min-width:0!important}
+ .catalogue-stall{display:grid!important;grid-template-columns:1fr auto!important;gap:8px!important;align-items:center!important;width:100%!important;padding:12px!important;border:1px solid var(--line);border-radius:12px}
+ .catalogue-stall strong,.catalogue-stall small{min-width:0;overflow-wrap:anywhere}
+ .catalogue-stall .rowaction{justify-content:center;min-height:42px}
+ .catalogue-stall .rowaction:first-of-type{grid-column:1/2}
+ .catalogue-stall .rowaction:last-of-type{grid-column:2/3}
+ .ratetabs{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;overflow:visible!important}
+ .ratetabs button{min-width:0!important;padding:10px 6px!important;font-size:11px!important}
+}
+
+/* v5.2 mobile record editing */
+.fieldhelp{display:block;margin-top:5px;color:#667085;font-size:10px;font-weight:600}.savecontinue{border-color:#c9d5e5;background:#f8fafc}.modalactions{flex-wrap:wrap}
+@media(max-width:700px){.modal{width:100%!important;max-width:none!important;height:100dvh!important;max-height:100dvh!important;border-radius:0!important;padding:16px 14px calc(16px + env(safe-area-inset-bottom))!important}.modalhead{position:sticky;top:-16px;z-index:4;background:#fff;padding:16px 0 12px;border-bottom:1px solid var(--line)}.rulegrid{grid-template-columns:1fr!important}.rulegrid .wide{grid-column:auto!important}.modalactions{grid-template-columns:1fr!important}.modalactions button{min-height:50px!important}.catalogue-stall{display:grid!important;grid-template-columns:1fr auto;gap:8px!important;width:100%;padding:12px;border:1px solid var(--line);border-radius:12px}.catalogue-stall strong,.catalogue-stall small{grid-column:1/-1}.catalogue-stall button{width:100%;justify-content:center}}

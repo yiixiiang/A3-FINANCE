@@ -1,6 +1,6 @@
 {
-  "name": "a3-finance-v30-server-sync",
-  "version": "3.0.0",
+  "name": "a3-finance-v31-production",
+  "version": "3.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

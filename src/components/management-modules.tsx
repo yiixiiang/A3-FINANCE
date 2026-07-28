@@ -70,13 +70,13 @@ function activeJobPayoutTier(value?:string){
 }
 function findJobPayoutRate(value?:string){return Number(activeJobPayoutTier(value)?.amount||0)}
 function jobPayoutTierLabel(value?:string){const tier=activeJobPayoutTier(value);return tier?`${tier.minPax}-${tier.maxPax} pax · ${money2(tier.amount)}`:"No matching job payout tier"}
-const rateVehicleDefaults=["5 Seater","7 Seater","5 Seater Premium","7 Seater Premium","13 Seater","23 Seater"];
+const rateVehicleDefaults=["4 Seater Sedan","6 Seater MPV","7 Seater Maxi Cab","Alphard / Vellfire","13 Seater Minibus","23 Seater Mini Coach","45 Seater Coach"];
 const vehicleRateDefaults:ManagedRateRule[]=[
- {service:"Airport Arrival",tripType:"Per Trip",values:["70","80","80","90","90","170"],status:"Active"},
- {service:"Airport Departure",tripType:"Per Trip",values:["65","75","75","80","85","160"],status:"Active"},
- {service:"Point to Point",tripType:"Per Trip",values:["60","70","70","75","80","150"],status:"Active"},
- {service:"Hourly Disposal",tripType:"Per Hour",values:["55","65","65","75","70","120"],status:"Active"},
- {service:"Cross Border SG to JB",tripType:"Per Trip",values:["220","250","280","320","380","480"],status:"Active"}
+ {service:"Point to Point",tripType:"Per Trip",values:["45","50","55","65","75","120","160"],status:"Active"},
+ {service:"Airport Arrival",tripType:"Per Trip",values:["50","55","60","70","80","130","170"],status:"Active"},
+ {service:"Airport Departure",tripType:"Per Trip",values:["50","55","60","70","80","130","170"],status:"Active"},
+ {service:"Hourly Disposal (minimum 2 hours)",tripType:"Per Hour",values:["45","50","55","65","70","110","140"],status:"Active"},
+ {service:"Cross Border SG to JB (from)",tripType:"Per Trip",values:["120","130","140","170","210","300","420"],status:"Active"}
 ];
 const driverRateDefaults:ManagedRateRule[]=[
  {service:"Airport Arrival",tripType:"Per Trip",values:["40","45","65","70","85","120"],status:"Active"},
@@ -152,15 +152,17 @@ const FLEET_STORAGE_KEY="a3-limousine-fleet-v1";
 const CHARGES_STORAGE_KEY="a3-limousine-additional-charges-v1";
 const fleetDefaults:FleetVehicle[]=rateVehicleDefaults.map((name,index)=>({id:`VEH-${String(index+1).padStart(3,"0")}`,name,passengerCapacity:Number(name.match(/\d+/)?.[0]||0),luggageCapacity:0,description:"Premium chauffeur vehicle",imageUrl:"",status:"Active",displayOrder:index+1}));
 const chargeDefaults:AdditionalCharge[]=[
- {id:"CHG-001",code:"MIDNIGHT",name:"Midnight surcharge",chargeType:"Fixed",amount:15,description:"Per trip between 23:00 and 06:59.",status:"Active",displayOrder:1},
- {id:"CHG-002",code:"WAITING_15",name:"Waiting time",chargeType:"Fixed",amount:15,description:"Per 15-minute block after the complimentary waiting period (15 minutes for transfers; 60 minutes for airport arrivals).",status:"Active",displayOrder:2},
- {id:"CHG-003",code:"EXTRA_STOP",name:"Additional stop",chargeType:"Per Stop",amount:15,description:"Per additional stop within the normal route; longer detours may be priced as another transfer.",status:"Active",displayOrder:3},
- {id:"CHG-004",code:"CHILD_SEAT",name:"Child / booster seat",chargeType:"Per Seat",amount:15,description:"Advance request required and subject to availability.",status:"Active",displayOrder:4},
- {id:"CHG-005",code:"MEET_GREET",name:"Airport meet & greet",chargeType:"Fixed",amount:10,description:"Name-board meet and greet at the arrival hall.",status:"Active",displayOrder:5},
- {id:"CHG-006",code:"REMOTE_AREA",name:"Remote-area surcharge",chargeType:"Fixed",amount:15,description:"Applies to selected locations such as Tuas, Jurong Island, Sentosa and other outlying areas.",status:"Active",displayOrder:6},
- {id:"CHG-007",code:"WHEELCHAIR_BULKY",name:"Wheelchair / bulky item handling",chargeType:"Fixed",amount:10,description:"Advance notice required; excludes specialised wheelchair-accessible vehicles.",status:"Active",displayOrder:7},
- {id:"CHG-008",code:"ERP_PARKING",name:"ERP, tolls and parking",chargeType:"Actual Cost",amount:0,description:"Charged at actual cost where applicable.",status:"Active",displayOrder:8},
- {id:"CHG-009",code:"PEAK_EVENT",name:"Peak / major-event surcharge",chargeType:"Fixed",amount:25,description:"Optional surcharge for declared peak dates or major events; confirm before booking.",status:"Inactive",displayOrder:9}
+ {id:"CHG-001",code:"MIDNIGHT",name:"Midnight surcharge",chargeType:"Fixed",amount:10,description:"Per trip between 23:00 and 07:00.",status:"Active",displayOrder:1},
+ {id:"CHG-002",code:"WAITING_15",name:"Waiting time",chargeType:"Fixed",amount:10,description:"Per 15-minute block after 15 minutes free for normal pickups or 60 minutes free for airport arrivals.",status:"Active",displayOrder:2},
+ {id:"CHG-003",code:"EXTRA_STOP_ROUTE",name:"Extra stop (same route)",chargeType:"Per Stop",amount:10,description:"For a short additional stop along the normal journey.",status:"Active",displayOrder:3},
+ {id:"CHG-004",code:"EXTRA_STOP_DETOUR",name:"Extra stop (detour)",chargeType:"Per Stop",amount:20,description:"For an additional stop requiring a material route deviation.",status:"Active",displayOrder:4},
+ {id:"CHG-005",code:"CHILD_SEAT",name:"Child seat",chargeType:"Per Seat",amount:15,description:"Advance request required and subject to availability.",status:"Active",displayOrder:5},
+ {id:"CHG-006",code:"BOOSTER_SEAT",name:"Booster seat",chargeType:"Per Seat",amount:10,description:"Advance request required and subject to availability.",status:"Active",displayOrder:6},
+ {id:"CHG-007",code:"MEET_GREET",name:"Airport meet & greet",chargeType:"Fixed",amount:10,description:"Name-board meet and greet at the arrival hall.",status:"Active",displayOrder:7},
+ {id:"CHG-008",code:"SENTOSA",name:"Sentosa surcharge",chargeType:"Fixed",amount:10,description:"Applied to pickups or drop-offs on Sentosa Island.",status:"Active",displayOrder:8},
+ {id:"CHG-009",code:"REMOTE_AREA",name:"Tuas / remote-area surcharge",chargeType:"Fixed",amount:15,description:"Applied to selected remote or restricted locations.",status:"Active",displayOrder:9},
+ {id:"CHG-010",code:"WHEELCHAIR_BULKY",name:"Wheelchair / bulky-item handling",chargeType:"Fixed",amount:10,description:"Advance notice required; specialised accessible vehicles are quoted separately.",status:"Active",displayOrder:10},
+ {id:"CHG-011",code:"ERP_PARKING",name:"ERP, tolls and parking",chargeType:"Actual Cost",amount:0,description:"Charged at actual cost where applicable.",status:"Active",displayOrder:11}
 ];
 function FleetManagement(){
  const [vehicles,setVehicles]=useState<FleetVehicle[]>(()=>load(FLEET_STORAGE_KEY,fleetDefaults));

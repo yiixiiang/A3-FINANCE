@@ -12,7 +12,7 @@ type Item={id:string;label:string;icon:any};
 const nav: {label:string;items:Item[]}[]=[
  {label:"Workspace",items:[{id:"overview",label:"Executive Overview",icon:LayoutDashboard}]},
  {label:"Booking",items:[{id:"limousine",label:"Website Limousine Bookings",icon:CarFront},{id:"sakura",label:"Website Sakura Table Bookings",icon:UtensilsCrossed}]},
- {label:"Driver",items:[{id:"payout",label:"Driver Report Payout",icon:WalletCards},{id:"rebate",label:"Driver 10% Rebate",icon:Percent},{id:"network",label:"Driver Network",icon:Network},{id:"driversignup",label:"Driver Sign-Up / Profile",icon:Users},{id:"driverclaims",label:"Driver Claims",icon:ReceiptText}]},
+ {label:"Driver",items:[{id:"payout",label:"Driver Report Payout",icon:WalletCards},{id:"rebate",label:"Driver 10% Rebate",icon:Percent},{id:"network",label:"Driver Network",icon:Network},{id:"driverclaims",label:"Driver Claims",icon:ReceiptText}]},
  {label:"Fleet & Settings",items:[{id:"ratemanagement",label:"Rate Management",icon:Settings2},{id:"clientsetup",label:"Client Management",icon:Users},{id:"drivers",label:"Driver Management",icon:Users},{id:"catalogue",label:"Website Catalogue",icon:Globe2},{id:"company",label:"Company Management",icon:Settings2},{id:"cloud",label:"Cloud & Backup",icon:Database},{id:"access",label:"User Access",icon:ShieldCheck}]},
  {label:"Report",items:[{id:"income",label:"Income",icon:TrendingUp},{id:"expenses",label:"Expense",icon:ReceiptText},{id:"platform",label:"Platform Earning",icon:Banknote},{id:"invoice",label:"Invoice",icon:ReceiptText},{id:"quotation",label:"Quotation",icon:FileText},{id:"reports",label:"Profit & Loss",icon:BarChart3},{id:"balancesheet",label:"Balance Sheet",icon:WalletCards}]}
 ];

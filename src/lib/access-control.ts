@@ -37,7 +37,6 @@ export const ACCESS_MODULES: AccessModule[] = [
   { id: "payout", label: "Driver Report Payout", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "rebate", label: "Driver 10% Rebate", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "network", label: "Driver Network", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
-  { id: "driversignup", label: "Driver Sign-Up / Profile", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "driverclaims", label: "Driver Claims", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "ratemanagement", label: "Rate Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "clientsetup", label: "Client Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
@@ -59,7 +58,7 @@ const moduleById = new Map(ACCESS_MODULES.map(module => [module.id, module]));
 
 const legacyModuleAliases: Record<string, string[]> = {
   Booking: ["limousine", "sakura"],
-  "Driver Reports": ["payout", "rebate", "network", "driversignup", "driverclaims"],
+  "Driver Reports": ["payout", "rebate", "network", "driverclaims"],
   "Driver Claims": ["driverclaims"],
   Rates: ["ratemanagement"],
   "Client Setup": ["clientsetup"],

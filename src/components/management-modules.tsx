@@ -21,6 +21,7 @@ export function ManagementModules({active,user}:{active:string;user:UserAccessRe
   {active==="clientsetup"&&<ClientSetup/>}
   {active==="catalogue"&&<WebsiteCatalogueRate/>}
   {active==="company"&&<CompanySetting/>}
+  {active==="driversignup"&&<DriverSignUp/>}
   {active==="driverclaims"&&<DriverClaims/>}
   {active==="access"&&<UserAccess currentUser={user}/>}
   {active==="income"&&<IncomeRecords/>}

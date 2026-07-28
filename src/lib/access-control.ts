@@ -32,7 +32,7 @@ export const CURRENT_PERMISSION_REVISION = 7;
 
 export const ACCESS_MODULES: AccessModule[] = [
   { id: "overview", label: "Executive Overview", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
-  { id: "bookingmanagement", label: "Booking Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
+  { id: "bookings", label: "Booking Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "payout", label: "Driver Report Payout", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "rebate", label: "Driver 10% Rebate", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "network", label: "Driver Network", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
@@ -56,11 +56,7 @@ export const ACCESS_MODULES: AccessModule[] = [
 const moduleById = new Map(ACCESS_MODULES.map(module => [module.id, module]));
 
 const legacyModuleAliases: Record<string, string[]> = {
-  Booking: ["bookingmanagement"],
-  "Website Limousine Bookings": ["bookingmanagement"],
-  "Website Sakura Table Bookings": ["bookingmanagement"],
-  limousine: ["bookingmanagement"],
-  sakura: ["bookingmanagement"],
+  Booking: ["bookings"],
   "Driver Reports": ["payout", "rebate", "network", "driverclaims"],
   "Driver Claims": ["driverclaims"],
   Rates: ["ratemanagement"],
@@ -160,8 +156,8 @@ export function normalizeUserRecord(value: Partial<Omit<UserAccessRecord, "role"
   const storedPermissionRevision = Number(value.permissionRevision) || 0;
   const isExistingRecord = typeof value.id === "string" && Boolean(value.id);
   const migrationModules: Record<AccessRole, string[]> = {
-    ADMIN: ["bookingmanagement", "clientsetup", "income", "access", "driverclaims", "balancesheet", "cloud"],
-    COMPANY_ADMIN: ["bookingmanagement", "clientsetup", "income", "driverclaims", "balancesheet"],
+    ADMIN: ["clientsetup", "income", "access", "driverclaims", "balancesheet", "cloud"],
+    COMPANY_ADMIN: ["clientsetup", "income", "driverclaims", "balancesheet"],
     DRIVER: ["driverclaims"],
   };
   const migratedModules = isExistingRecord && storedPermissionRevision < CURRENT_PERMISSION_REVISION

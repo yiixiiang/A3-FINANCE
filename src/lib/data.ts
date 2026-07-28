@@ -14,9 +14,4 @@ export const rates: Record<string,string[]> = {
   "Childseat 1-7 Year Old":["+S$15","+S$15","+S$15","+S$15","+S$15","+S$15"],
   "Singapore Postal Code Start 60-80":["+S$10","+S$10","+S$15","+S$15","+S$20","+S$25"]
 };
-export const bookings = [
-  ["A3L-260725-018","Nicole Tan","25 Jul · 14:30","Airport Arrival","7 Seater Premium","Confirmed","S$150"],
-  ["A3L-260725-017","Daniel Koh","25 Jul · 16:15","Point to Point","5 Seater","Driver assigned","S$55"],
-  ["A3L-260725-016","Mei Lin","25 Jul · 23:40","Airport Departure","7 Seater","Pending","S$90"],
-  ["A3L-260725-015","Horizon Events","26 Jul · 09:00","Hourly Disposal","23 Seater","Confirmed","S$880"]
-];
+export const bookings: string[][] = [];

@@ -232,3 +232,16 @@ input,select,textarea{font-size:16px}
 }
 
 /* Booking management additions are maintained in src/app/globals.css. */
+
+/* Booking detail route and publishing improvements */
+.journeycard{grid-column:span 2;background:linear-gradient(180deg,#fff,#fbfcff)!important}
+.routepoint{display:flex;gap:12px;align-items:flex-start;margin:8px 0}
+.routepoint>div{display:grid;gap:3px;min-width:0}
+.routepoint small{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#718096;font-weight:700}
+.routepoint strong{font-size:14px;line-height:1.45;overflow-wrap:anywhere;color:#18243a}
+.routedot{width:13px;height:13px;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 2px #64748b;flex:0 0 auto;margin-top:4px}
+.pickupdot{box-shadow:0 0 0 2px #16a34a;background:#16a34a}.dropoffdot{box-shadow:0 0 0 2px #dc2626;background:#dc2626}
+.routeline{height:25px;border-left:2px dashed #cbd5e1;margin-left:6px}
+.publishnotice{display:flex;align-items:center;gap:9px;padding:10px 13px;border-radius:10px;background:#ecfdf5;color:#166534;font-weight:700;font-size:13px}
+.publishnotice.error{background:#fef2f2;color:#991b1b}
+@media(max-width:760px){.journeycard{grid-column:span 1}.bookingdetailmodal{width:min(96vw,720px)}}

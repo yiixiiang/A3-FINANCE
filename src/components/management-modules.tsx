@@ -125,7 +125,12 @@ function ManagedRateMatrix({kind,title,eyebrow,copy,defaults,client}:{kind:strin
  const vehicleKey="a3-rate-management-vehicles-v1";
  const rulesKey=`a3-rate-management-${kind}-rules-v1`;
  const [vehicles,setVehicles]=useState<string[]>(()=>load(vehicleKey,rateVehicleDefaults));
- const [rules,setRules]=useState<ManagedRateRule[]>(()=>load(rulesKey,defaults));
+ const [rules,setRules]=useState<ManagedRateRule[]>(()=>{
+  const saved=load<ManagedRateRule[]>(rulesKey,defaults);
+  if(kind!=="vehicle")return saved;
+  const missing=defaults.filter(defaultRule=>!saved.some(rule=>rule.service.trim().toLowerCase()===defaultRule.service.trim().toLowerCase()));
+  return missing.length?[...saved,...missing.map(rule=>({...rule,values:[...rule.values]}))]:saved;
+ });
  const [editing,setEditing]=useState<{index:number|null;rule:ManagedRateRule}|null>(null);
  const [vehicleOpen,setVehicleOpen]=useState(false); const [newVehicle,setNewVehicle]=useState(""); const [publishState,setPublishState]=useState<""|"publishing"|"success"|"error">(""); const canManageVehicles=kind==="vehicle";
  useEffect(()=>save(vehicleKey,vehicles),[vehicles]);

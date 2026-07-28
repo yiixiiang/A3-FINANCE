@@ -28,16 +28,14 @@ export const LOGIN_SESSION_KEY = "a3-login-session-v1";
 export const MINIMUM_PASSWORD_LENGTH = 6;
 export const DEFAULT_ADMIN_USERNAME = "admin";
 export const DEFAULT_ADMIN_PASSWORD = "admin123";
-export const CURRENT_PERMISSION_REVISION = 6;
+export const CURRENT_PERMISSION_REVISION = 7;
 
 export const ACCESS_MODULES: AccessModule[] = [
   { id: "overview", label: "Executive Overview", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
-  { id: "limousine", label: "Website Limousine Bookings", roles: ["ADMIN", "COMPANY_ADMIN"] },
-  { id: "sakura", label: "Website Sakura Table Bookings", roles: ["ADMIN", "COMPANY_ADMIN"] },
+  { id: "bookingmanagement", label: "Booking Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "payout", label: "Driver Report Payout", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "rebate", label: "Driver 10% Rebate", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "network", label: "Driver Network", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
-  { id: "driversignup", label: "Driver Sign-Up / Profile", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "driverclaims", label: "Driver Claims", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "ratemanagement", label: "Rate Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "clientsetup", label: "Client Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
@@ -58,8 +56,12 @@ export const ACCESS_MODULES: AccessModule[] = [
 const moduleById = new Map(ACCESS_MODULES.map(module => [module.id, module]));
 
 const legacyModuleAliases: Record<string, string[]> = {
-  Booking: ["limousine", "sakura"],
-  "Driver Reports": ["payout", "rebate", "network", "driversignup", "driverclaims"],
+  Booking: ["bookingmanagement"],
+  "Website Limousine Bookings": ["bookingmanagement"],
+  "Website Sakura Table Bookings": ["bookingmanagement"],
+  limousine: ["bookingmanagement"],
+  sakura: ["bookingmanagement"],
+  "Driver Reports": ["payout", "rebate", "network", "driverclaims"],
   "Driver Claims": ["driverclaims"],
   Rates: ["ratemanagement"],
   "Client Setup": ["clientsetup"],
@@ -158,8 +160,8 @@ export function normalizeUserRecord(value: Partial<Omit<UserAccessRecord, "role"
   const storedPermissionRevision = Number(value.permissionRevision) || 0;
   const isExistingRecord = typeof value.id === "string" && Boolean(value.id);
   const migrationModules: Record<AccessRole, string[]> = {
-    ADMIN: ["clientsetup", "income", "access", "driverclaims", "balancesheet", "cloud"],
-    COMPANY_ADMIN: ["clientsetup", "income", "driverclaims", "balancesheet"],
+    ADMIN: ["bookingmanagement", "clientsetup", "income", "access", "driverclaims", "balancesheet", "cloud"],
+    COMPANY_ADMIN: ["bookingmanagement", "clientsetup", "income", "driverclaims", "balancesheet"],
     DRIVER: ["driverclaims"],
   };
   const migratedModules = isExistingRecord && storedPermissionRevision < CURRENT_PERMISSION_REVISION

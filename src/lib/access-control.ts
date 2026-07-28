@@ -32,7 +32,7 @@ export const CURRENT_PERMISSION_REVISION = 7;
 
 export const ACCESS_MODULES: AccessModule[] = [
   { id: "overview", label: "Executive Overview", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
-  { id: "bookings", label: "Booking Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
+  { id: "bookingmanagement", label: "Booking Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "payout", label: "Driver Report Payout", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "rebate", label: "Driver 10% Rebate", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "network", label: "Driver Network", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
@@ -56,8 +56,10 @@ export const ACCESS_MODULES: AccessModule[] = [
 const moduleById = new Map(ACCESS_MODULES.map(module => [module.id, module]));
 
 const legacyModuleAliases: Record<string, string[]> = {
-  Booking: ["bookings"],
-  "Driver Reports": ["payout", "rebate", "network", "driverclaims"],
+  Booking: ["bookingmanagement"],
+  "Website Limousine Bookings": ["bookingmanagement"],
+  "Website Sakura Table Bookings": ["bookingmanagement"],
+  "Driver Reports": ["payout", "rebate", "network", "driverclaims", "drivers"],
   "Driver Claims": ["driverclaims"],
   Rates: ["ratemanagement"],
   "Client Setup": ["clientsetup"],

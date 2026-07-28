@@ -4,11 +4,11 @@ import { createClient } from "@supabase/supabase-js";
 export const dynamic = "force-dynamic";
 const DEFAULT_VEHICLES=["5 Seater","7 Seater","5 Seater Premium","7 Seater Premium","13 Seater","23 Seater"];
 const DEFAULT_RATES=[
- {service:"Airport Arrival",tripType:"Per Trip",values:["65","75","95","110","130","180"],status:"Active"},
- {service:"Airport Departure",tripType:"Per Trip",values:["60","70","90","105","125","175"],status:"Active"},
- {service:"Point to Point",tripType:"Per Trip",values:["55","65","85","100","120","165"],status:"Active"},
- {service:"Hourly Disposal",tripType:"Per Hour",values:["60","70","90","105","120","160"],status:"Active"},
- {service:"Cross Border SG to JB",tripType:"Per Trip",values:["220","250","300","330","380","480"],status:"Active"}
+ {service:"Airport Arrival",tripType:"Per Trip",values:["70","80","80","90","90","170"],status:"Active"},
+ {service:"Airport Departure",tripType:"Per Trip",values:["65","75","75","80","85","160"],status:"Active"},
+ {service:"Point to Point",tripType:"Per Trip",values:["60","70","70","75","80","150"],status:"Active"},
+ {service:"Hourly Disposal",tripType:"Per Hour",values:["55","65","65","75","70","120"],status:"Active"},
+ {service:"Cross Border SG to JB",tripType:"Per Trip",values:["220","250","280","320","380","480"],status:"Active"}
 ];
 const serviceType=(value:string)=>({"Airport Arrival":"airport_arrival","Airport Departure":"airport_departure","Point to Point":"point_to_point","Hourly Disposal":"hourly_disposal","Cross Border SG to JB":"sg_jb"}[value]||value.toLowerCase().replace(/[^a-z0-9]+/g,"_"));
 function client(){const url=process.env.NEXT_PUBLIC_SUPABASE_URL||process.env.SUPABASE_URL||"";const key=process.env.SUPABASE_SERVICE_ROLE_KEY||process.env.SUPABASE_SECRET_KEY||"";if(!url||!key)throw new Error("Finance cloud is not configured.");return createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}})}

@@ -8,8 +8,8 @@ const DEFAULT_RATES = [
   { service: "Airport Arrival", tripType: "Per Trip", values: ["70", "80", "80", "90", "90", "170"], status: "Active" },
   { service: "Airport Departure", tripType: "Per Trip", values: ["65", "75", "75", "80", "85", "160"], status: "Active" },
   { service: "Point to Point", tripType: "Per Trip", values: ["60", "70", "70", "75", "80", "150"], status: "Active" },
-  { service: "Hourly Disposal", tripType: "Per Hour", values: ["55", "65", "65", "75", "70", "120"], status: "Active" },
-  { service: "Cross Border SG to JB", tripType: "Per Trip", values: ["220", "250", "280", "320", "380", "480"], status: "Active" },
+  { service: "Hourly Disposal (minimum 3 hours)", tripType: "Per Hour", values: ["55", "65", "65", "75", "70", "120"], status: "Active" },
+  { service: "Cross Border SG to JB (from)", tripType: "Per Trip", values: ["220", "250", "280", "320", "380", "480"], status: "Active" },
 ];
 
 const serviceType = (value: string) =>
@@ -18,7 +18,9 @@ const serviceType = (value: string) =>
     "Airport Departure": "airport_departure",
     "Point to Point": "point_to_point",
     "Hourly Disposal": "hourly_disposal",
+    "Hourly Disposal (minimum 3 hours)": "hourly_disposal",
     "Cross Border SG to JB": "sg_jb",
+    "Cross Border SG to JB (from)": "sg_jb",
   } as Record<string, string>)[value] || value.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 
 function client() {
@@ -114,6 +116,7 @@ export async function GET() {
         amount: Number(item.amount || 0),
         currency: "SGD",
         description: item.description || "",
+        is_percentage: String(item.chargeType || "").toLowerCase() === "percentage",
       }));
 
     return NextResponse.json(

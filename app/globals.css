@@ -230,7 +230,3 @@ input,select,textarea{font-size:16px}
  .ratetabs{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;overflow:visible!important}
  .ratetabs button{min-width:0!important;padding:10px 6px!important;font-size:11px!important}
 }
-
-/* v5.2 mobile record editing */
-.fieldhelp{display:block;margin-top:5px;color:#667085;font-size:10px;font-weight:600}.savecontinue{border-color:#c9d5e5;background:#f8fafc}.modalactions{flex-wrap:wrap}
-@media(max-width:700px){.modal{width:100%!important;max-width:none!important;height:100dvh!important;max-height:100dvh!important;border-radius:0!important;padding:16px 14px calc(16px + env(safe-area-inset-bottom))!important}.modalhead{position:sticky;top:-16px;z-index:4;background:#fff;padding:16px 0 12px;border-bottom:1px solid var(--line)}.rulegrid{grid-template-columns:1fr!important}.rulegrid .wide{grid-column:auto!important}.modalactions{grid-template-columns:1fr!important}.modalactions button{min-height:50px!important}.catalogue-stall{display:grid!important;grid-template-columns:1fr auto;gap:8px!important;width:100%;padding:12px;border:1px solid var(--line);border-radius:12px}.catalogue-stall strong,.catalogue-stall small{grid-column:1/-1}.catalogue-stall button{width:100%;justify-content:center}}

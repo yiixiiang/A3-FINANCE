@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_VEHICLES = ["5 Seater", "7 Seater", "5 Seater Premium", "7 Seater Premium", "13 Seater", "23 Seater"];
+const DEFAULT_VEHICLES = ["4 Seater Sedan", "6 Seater MPV", "7 Seater Maxi Cab", "Alphard / Vellfire", "13 Seater Minibus", "23 Seater Mini Coach", "45 Seater Coach"];
 const DEFAULT_RATES = [
   { service: "Airport Arrival", tripType: "Per Trip", values: ["70", "80", "80", "90", "90", "170"], status: "Active" },
   { service: "Airport Departure", tripType: "Per Trip", values: ["65", "75", "75", "80", "85", "160"], status: "Active" },
@@ -75,7 +75,7 @@ export async function GET() {
       .sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
 
     const vehicleTypes = names.map((name, index) => {
-      const detail = activeFleet.find((item) => item.name === name) || {};
+      const detail = activeFleet.find((item) => String(item.name || "").trim().toLowerCase() === name.trim().toLowerCase()) || activeFleet[index] || {};
       return {
         id: index + 1,
         name,
@@ -99,7 +99,7 @@ export async function GET() {
           pricing_method: rule.tripType === "Per Hour" ? "per_hour" : rule.tripType === "Per Seat" ? "per_seat" : "per_trip",
           base_amount: Number(rule.values?.[index] || 0),
           currency: "SGD",
-          minimum_hours: null,
+          minimum_hours: serviceType(String(rule.service || "")) === "hourly_disposal" ? 3 : null,
           vehicle: vehicleTypes[index],
         })),
       );

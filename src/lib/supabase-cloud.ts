@@ -14,7 +14,18 @@ const syncable=(k:string)=>k.startsWith(PREFIX)&&!LOCAL.has(k);
 const localRecords=()=>{const records:Array<{storage_key:string;value:unknown}>=[];if(typeof window==="undefined")return records;for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i)||"";if(!syncable(k))continue;try{records.push({storage_key:k,value:JSON.parse(localStorage.getItem(k)||"null")})}catch{records.push({storage_key:k,value:localStorage.getItem(k)})}}return records};
 const notifyCloudApplied=(key:string,value:unknown)=>{if(typeof window==="undefined")return;const newValue=JSON.stringify(value);window.dispatchEvent(new CustomEvent("a3-storage-updated",{detail:{key,source:"cloud"}}));try{window.dispatchEvent(new StorageEvent("storage",{key,newValue,storageArea:window.localStorage,url:window.location.href}))}catch{window.dispatchEvent(new Event("storage"))}};
 const applyCloudRecords=(records:Array<{storage_key:string;value:unknown}>)=>{let changed=0;for(const record of records){if(!syncable(record.storage_key))continue;const serialized=JSON.stringify(record.value);if(localStorage.getItem(record.storage_key)===serialized)continue;localStorage.setItem(record.storage_key,serialized);pending.delete(record.storage_key);notifyCloudApplied(record.storage_key,record.value);changed++}if(changed)window.dispatchEvent(new Event(CLOUD_SYNCED_EVENT));return changed};
-async function api(action?:string,body:Record<string,unknown>={}){const r=await fetch("/api/cloud",action?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,...body}),cache:"no-store"}:{cache:"no-store"});const p=await r.json().catch(()=>({ok:false,message:"Invalid cloud response"}));if(!r.ok||!p.ok)throw new Error(p.message||"Cloud request failed");return p;}
+async function api(action?:string,body:Record<string,unknown>={}){
+ const options=action?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,...body}),cache:"no-store" as RequestCache}:{cache:"no-store" as RequestCache};
+ const r=await fetch("/api/cloud",options);
+ const text=await r.text();
+ let p:any;
+ try{p=text?JSON.parse(text):{ok:false,message:"Cloud returned an empty response."}}catch{
+  const hint=r.status===413?"Cloud upload is too large. Vehicle photos will be compressed before publishing.":r.status===504?"Cloud request timed out. Please try publishing again.":`Cloud returned ${r.status} ${r.statusText || "an invalid response"}.`;
+  throw new Error(hint);
+ }
+ if(!r.ok||!p.ok)throw new Error(p.message||`Cloud request failed (${r.status}).`);
+ return p;
+}
 const stamp=()=>{const now=new Date().toISOString();localStorage.setItem(META,now);return now};
 export function queueCloudAudit(action:string,storageKey:string,details:Record<string,unknown>={}){void api("audit",{events:[{created_at:new Date().toISOString(),action,storage_key:storageKey,device_id:"browser",details}]}).catch(()=>undefined)}
 export function queueCloudWrite(key:string,value:unknown,immediate=false){if(!syncable(key))return;pending.set(key,value);if(timer)window.clearTimeout(timer);timer=window.setTimeout(()=>void flushPendingCloudWrites(),immediate?50:900)}
@@ -31,6 +42,14 @@ export async function signInAndHydrateCloud(){return resumeCloudSession()}
 export async function hydrateCloudStorage(){await restoreAllCloudDataToLocal()}
 export async function flushPendingCloudWrites(){if(!pending.size)return;const records=[...pending].map(([storage_key,value])=>({storage_key,value}));pending.clear();emit("syncing");try{await api("push",{records});stamp();emit("connected")}catch(e){records.forEach(r=>pending.set(r.storage_key,r.value));emit("error",e instanceof Error?e.message:String(e));throw e}}
 export async function resumeCloudSession(){try{await verifyCloudConnection();await synchronizeCloudNow();return {ok:true,message:"Server cloud connected."}}catch(e){return {ok:false,message:e instanceof Error?e.message:String(e)}}}
+
+export async function uploadStorageKeysToCloud(keys:string[]){
+ const records=keys.filter(syncable).map(storage_key=>{const raw=localStorage.getItem(storage_key);let value:unknown=raw;try{value=JSON.parse(raw||"null")}catch{}return {storage_key,value}});
+ if(!records.length)return verifyCloudConnection();
+ // Send one storage record at a time so Vercel never receives one oversized combined request.
+ for(const record of records)await api("push",{records:[record]});
+ stamp();emit("connected");return verifyCloudConnection();
+}
 export async function uploadAllLocalDataToCloud(){emit("syncing");await api("push",{records:localRecords()});stamp();emit("connected");return verifyCloudConnection()}
 export async function restoreAllCloudDataToLocal(){emit("syncing");const p=await api("pull");applyCloudRecords(p.records||[]);stamp();emit("connected");return verifyCloudConnection()}
 export async function synchronizeCloudNow(){

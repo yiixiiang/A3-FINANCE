@@ -28,7 +28,7 @@ export const LOGIN_SESSION_KEY = "a3-login-session-v1";
 export const MINIMUM_PASSWORD_LENGTH = 6;
 export const DEFAULT_ADMIN_USERNAME = "admin";
 export const DEFAULT_ADMIN_PASSWORD = "admin123";
-export const CURRENT_PERMISSION_REVISION = 8;
+export const CURRENT_PERMISSION_REVISION = 7;
 
 export const ACCESS_MODULES: AccessModule[] = [
   { id: "overview", label: "Executive Overview", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
@@ -37,11 +37,10 @@ export const ACCESS_MODULES: AccessModule[] = [
   { id: "rebate", label: "Driver 10% Rebate", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "network", label: "Driver Network", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
   { id: "driverclaims", label: "Driver Claims", roles: ["ADMIN", "COMPANY_ADMIN", "DRIVER"] },
-  { id: "ratemanagement", label: "Rate Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
+  { id: "ratemanagement", label: "Limousine Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "clientsetup", label: "Client Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "drivers", label: "Driver Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "catalogue", label: "Website Catalogue", roles: ["ADMIN", "COMPANY_ADMIN"] },
-  { id: "terms", label: "Terms & Conditions", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "company", label: "Company Management", roles: ["ADMIN", "COMPANY_ADMIN"] },
   { id: "cloud", label: "Cloud & Backup", roles: ["ADMIN"] },
   { id: "income", label: "Income", roles: ["ADMIN", "COMPANY_ADMIN"] },
@@ -159,8 +158,8 @@ export function normalizeUserRecord(value: Partial<Omit<UserAccessRecord, "role"
   const storedPermissionRevision = Number(value.permissionRevision) || 0;
   const isExistingRecord = typeof value.id === "string" && Boolean(value.id);
   const migrationModules: Record<AccessRole, string[]> = {
-    ADMIN: ["clientsetup", "income", "access", "driverclaims", "balancesheet", "cloud", "terms"],
-    COMPANY_ADMIN: ["clientsetup", "income", "driverclaims", "balancesheet", "terms"],
+    ADMIN: ["clientsetup", "income", "access", "driverclaims", "balancesheet", "cloud"],
+    COMPANY_ADMIN: ["clientsetup", "income", "driverclaims", "balancesheet"],
     DRIVER: ["driverclaims"],
   };
   const migratedModules = isExistingRecord && storedPermissionRevision < CURRENT_PERMISSION_REVISION

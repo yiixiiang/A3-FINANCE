@@ -44,16 +44,21 @@ function RateManagement(){
  return <><Heading eyebrow="ADMIN · CENTRAL PRICING" title="Limousine Management" copy="One simple workspace for vehicle names, photos, capacities, public rates and additional charges. Fleet & Photos is the master vehicle list used everywhere."/><div className="ratetabs" role="tablist" aria-label="Limousine management sections"><button role="tab" aria-selected={tab==="limousine"} className={tab==="limousine"?"active":""} onClick={()=>setTab("limousine")}><CarFront size={17}/>Website Rates & Fleet</button><button role="tab" aria-selected={tab==="driver"} className={tab==="driver"?"active":""} onClick={()=>setTab("driver")}><WalletCards size={17}/>Job Payout Rate</button><button role="tab" aria-selected={tab==="client"} className={tab==="client"?"active":""} onClick={()=>setTab("client")}><Users size={17}/>Client Fix Rate</button></div><div className="rateworkspace">{tab==="limousine"&&<UnifiedLimousineWorkspace/>}{tab==="driver"&&<DriverFixRate/>}{tab==="client"&&<ClientFixRate/>}</div></>
 }
 
+const PUBLISH_META_STORAGE_KEY="a3-limousine-publish-meta-v1";
 function UnifiedLimousineWorkspace(){
  const [publishState,setPublishState]=useState<""|"publishing"|"success"|"error">("");
  const [message,setMessage]=useState("");
+ const [lastPublished,setLastPublished]=useState<any>(()=>load<any>(PUBLISH_META_STORAGE_KEY,null));
  const publishAll=async()=>{
   setPublishState("publishing");setMessage("");
   try{
    const synced=synchronizeRateVehiclesWithFleet();
    saveNow("a3-rate-management-vehicles-v1",synced.vehicles);
    saveNow("a3-rate-management-vehicle-rules-v1",synced.rules);
-   await uploadStorageKeysToCloud([FLEET_STORAGE_KEY,"a3-rate-management-vehicles-v1","a3-rate-management-vehicle-rules-v1",CHARGES_STORAGE_KEY]);
+   const startedAt=Date.now();
+   const publishMeta={published_at:new Date().toISOString(),published_by:"Finance CMS",version:"V51",status:"success"};
+   saveNow(PUBLISH_META_STORAGE_KEY,publishMeta);
+   await uploadStorageKeysToCloud([FLEET_STORAGE_KEY,"a3-rate-management-vehicles-v1","a3-rate-management-vehicle-rules-v1",CHARGES_STORAGE_KEY,PUBLISH_META_STORAGE_KEY]);
    const normalizeVehicleName=(value:unknown)=>String(value||"").trim().toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
    const expectedVehicles=load<FleetVehicle[]>(FLEET_STORAGE_KEY,fleetDefaults).filter(item=>item.status==="Active"&&!isRemovedPublicVehicle(item.name));
    let data:any={};let missing:string[]=[];
@@ -68,10 +73,15 @@ function UnifiedLimousineWorkspace(){
     if(attempt<2)await new Promise(resolve=>setTimeout(resolve,700*(attempt+1)));
    }
    if(missing.length)throw new Error(`Public API is missing: ${missing.join(", ")}. The fleet was saved, but the public endpoint has not updated yet.`);
+   const completed={...publishMeta,duration_ms:Date.now()-startedAt,vehicles:data.vehicle_types.length,rate_rows:data.rate_cards.length,charges:data.additional_charges.length};
+   saveNow(PUBLISH_META_STORAGE_KEY,completed);setLastPublished(completed);
+   void uploadStorageKeysToCloud([PUBLISH_META_STORAGE_KEY]);
    setPublishState("success");setMessage(`Published ${data.vehicle_types.length} vehicles, ${data.rate_cards.length} rate rows and ${data.additional_charges.length} additional charges.`);
   }catch(error){setPublishState("error");setMessage(error instanceof Error?error.message:"Unable to publish limousine data.")}
  };
+ const formattedPublished=lastPublished?.published_at?new Intl.DateTimeFormat("en-SG",{timeZone:"Asia/Singapore",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:true}).format(new Date(lastPublished.published_at)):"Not published yet";
  return <div className="limousine-unified">
+  <div className="publishnotice"><CheckCircle2 size={17}/> <strong>Website status:</strong> {lastPublished?.published_at?`Live · Updated ${formattedPublished} (SGT)`:"Waiting for first publish"}{lastPublished?.duration_ms?` · ${(lastPublished.duration_ms/1000).toFixed(1)}s`:""}</div>
   <div className="rateactions limousine-publish-all"><span>Save and publish fleet, photos, vehicle rates and additional charges together.</span><button className="primary" disabled={publishState==="publishing"} onClick={()=>void publishAll()}><Send size={17}/>{publishState==="publishing"?"Publishing everything…":"Publish All to Limousine Website"}</button></div>
   {message&&<div className={`publishnotice ${publishState==="error"?"error":""}`}>{publishState==="error"?<X size={17}/>:<CheckCircle2 size={17}/>} {message}</div>}
   <div className="limousine-overview">

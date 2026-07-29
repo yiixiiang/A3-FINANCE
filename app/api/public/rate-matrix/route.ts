@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 const DEFAULT_VEHICLES = ["4 Seater Sedan", "6 Seater MPV", "7 Seater Maxi Cab", "Alphard / Vellfire", "13 Seater Minibus"];
 const isRemovedPublicVehicle = (value: unknown) => /\b(?:23|45)\s*seater\b/i.test(String(value || ""));
@@ -39,6 +39,7 @@ export async function GET() {
       "a3-rate-management-vehicle-rules-v1",
       "a3-limousine-fleet-v1",
       "a3-limousine-additional-charges-v1",
+      "a3-limousine-publish-meta-v1",
     ];
 
     const { data, error } = await supabase
@@ -166,16 +167,22 @@ export async function GET() {
         is_percentage: String(item.chargeType || "").toLowerCase() === "percentage",
       }));
 
+    const publishMeta = (values[keys[4]] && typeof values[keys[4]] === "object") ? values[keys[4]] as Record<string, unknown> : {};
+    const latestStorageUpdate = rows.map((row) => row.updated_at).filter(Boolean).sort().at(-1) || null;
+
     return NextResponse.json(
       {
         source: "A3 Finance",
         currency: "SGD",
-        updated_at: rows.map((row) => row.updated_at).filter(Boolean).sort().at(-1) || null,
+        updated_at: String(publishMeta.published_at || latestStorageUpdate || "") || null,
+        published_at: String(publishMeta.published_at || latestStorageUpdate || "") || null,
+        published_by: String(publishMeta.published_by || "Finance CMS"),
+        publish_version: String(publishMeta.version || "V51"),
         vehicle_types: vehicleTypes,
         rate_cards: rateCards,
         additional_charges: charges,
       },
-      { headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } },
+      { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=86400", "Access-Control-Allow-Origin": "*" } },
     );
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to publish rates." }, { status: 500 });

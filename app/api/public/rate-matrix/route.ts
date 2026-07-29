@@ -54,12 +54,12 @@ export async function GET() {
     }
 
     const rawNames = values[keys[0]];
-    const names: string[] = Array.isArray(rawNames) ? rawNames.map((value: unknown) => String(value)) : DEFAULT_VEHICLES;
+    const rateNames: string[] = Array.isArray(rawNames) ? rawNames.map((value: unknown) => String(value).trim()).filter(Boolean) : DEFAULT_VEHICLES;
 
     const rawFleet = values[keys[2]];
     const fleet: any[] = Array.isArray(rawFleet)
       ? (rawFleet as any[])
-      : names.map((name, index) => ({
+      : rateNames.map((name, index) => ({
           id: `VEH-${index + 1}`,
           name,
           passengerCapacity: Number(name.match(/\d+/)?.[0] || 0),
@@ -71,8 +71,21 @@ export async function GET() {
         }));
 
     const activeFleet = fleet
-      .filter((item) => item.status !== "Inactive")
+      .filter((item) => String(item.status || "Active").toLowerCase() !== "inactive")
       .sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
+
+    // Fleet & Photos is allowed to contain a newly added active vehicle before a
+    // matching rate column has been created. Publish every active fleet vehicle,
+    // while preserving the Vehicle Rates order for vehicles that already have rates.
+    const names = [...rateNames];
+    const knownNames = new Set(rateNames.map((name) => name.toLowerCase()));
+    for (const item of activeFleet) {
+      const name = String(item.name || "").trim();
+      if (name && !knownNames.has(name.toLowerCase())) {
+        names.push(name);
+        knownNames.add(name.toLowerCase());
+      }
+    }
 
     const vehicleTypes = names.map((name, index) => {
       const detail = activeFleet.find((item) => String(item.name || "").trim().toLowerCase() === name.trim().toLowerCase()) || activeFleet[index] || {};
@@ -91,17 +104,20 @@ export async function GET() {
     const rateCards = rules
       .filter((rule) => rule.status !== "Inactive")
       .flatMap((rule) =>
-        names.map((_, index) => ({
+        names.map((vehicleName, index) => {
+          const rateIndex = rateNames.findIndex((name) => name.toLowerCase() === vehicleName.toLowerCase());
+          return {
           id: `${serviceType(String(rule.service || "service"))}-${index + 1}`,
           vehicle_type_id: index + 1,
           name: String(rule.service || ""),
           service_type: serviceType(String(rule.service || "")),
           pricing_method: rule.tripType === "Per Hour" ? "per_hour" : rule.tripType === "Per Seat" ? "per_seat" : "per_trip",
-          base_amount: Number(rule.values?.[index] || 0),
+          base_amount: rateIndex >= 0 ? Number(rule.values?.[rateIndex] || 0) : 0,
           currency: "SGD",
           minimum_hours: serviceType(String(rule.service || "")) === "hourly_disposal" ? 3 : null,
           vehicle: vehicleTypes[index],
-        })),
+        };
+        }),
       );
 
     const rawCharges = values[keys[3]];

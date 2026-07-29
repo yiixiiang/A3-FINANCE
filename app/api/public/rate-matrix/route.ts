@@ -75,20 +75,13 @@ export async function GET() {
       .sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
 
     const normal = (value: unknown) => String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    const modernNames = new Set(["5 seater", "7 seater", "5 seater premium", "7 seater premium"]);
-    const legacyNames = new Set(["4 seater sedan", "6 seater mpv", "7 seater maxi cab", "alphard vellfire"]);
-    const hasModernFleet = allActiveFleet.some((item) => modernNames.has(normal(item.name)));
-
-    // When the new fleet naming set exists, suppress the old legacy aliases.
-    // This prevents the live website from rendering two price columns for the
-    // same class of vehicle after a fleet-name migration.
-    const filteredFleet = hasModernFleet
-      ? allActiveFleet.filter((item) => !legacyNames.has(normal(item.name)))
-      : allActiveFleet;
-
+    // Fleet & Vehicle Photos is the only public vehicle-name source.
+    // Do not suppress legacy-looking names: names such as "7 Seater Maxi Cab"
+    // may be intentional, active fleet entries. Exact normalized duplicates are
+    // removed below, while every distinct active fleet vehicle is published.
     const activeFleet: any[] = [];
     const seenFleetNames = new Set<string>();
-    for (const item of filteredFleet) {
+    for (const item of allActiveFleet) {
       const key = normal(item.name);
       if (!key || seenFleetNames.has(key)) continue;
       seenFleetNames.add(key);

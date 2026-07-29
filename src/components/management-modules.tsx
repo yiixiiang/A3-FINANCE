@@ -54,14 +54,20 @@ function UnifiedLimousineWorkspace(){
    saveNow("a3-rate-management-vehicles-v1",synced.vehicles);
    saveNow("a3-rate-management-vehicle-rules-v1",synced.rules);
    await uploadStorageKeysToCloud([FLEET_STORAGE_KEY,"a3-rate-management-vehicles-v1","a3-rate-management-vehicle-rules-v1",CHARGES_STORAGE_KEY]);
-   const response=await fetch(`/api/public/rate-matrix?t=${Date.now()}`,{cache:"no-store"});
-   const text=await response.text();
-   let data:any={};try{data=text?JSON.parse(text):{}}catch{throw new Error(`Public API returned an invalid response (${response.status}).`)}
-   if(!response.ok||!Array.isArray(data.vehicle_types)||!Array.isArray(data.rate_cards)||!Array.isArray(data.additional_charges))throw new Error(data?.error||"Publish verification failed.");
-   const expected=load<FleetVehicle[]>(FLEET_STORAGE_KEY,fleetDefaults).filter(item=>item.status==="Active").map(item=>item.name.trim().toLowerCase());
-   const returned=new Set(data.vehicle_types.map((item:any)=>String(item.name||"").trim().toLowerCase()));
-   const missing=expected.filter(name=>name&&!returned.has(name));
-   if(missing.length)throw new Error(`Public API is missing: ${missing.join(", ")}. Please publish again.`);
+   const normalizeVehicleName=(value:unknown)=>String(value||"").trim().toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+   const expectedVehicles=load<FleetVehicle[]>(FLEET_STORAGE_KEY,fleetDefaults).filter(item=>item.status==="Active");
+   let data:any={};let missing:string[]=[];
+   for(let attempt=0;attempt<3;attempt++){
+    const response=await fetch(`/api/public/rate-matrix?t=${Date.now()}-${attempt}`,{cache:"no-store"});
+    const text=await response.text();
+    try{data=text?JSON.parse(text):{}}catch{throw new Error(`Public API returned an invalid response (${response.status}).`)}
+    if(!response.ok||!Array.isArray(data.vehicle_types)||!Array.isArray(data.rate_cards)||!Array.isArray(data.additional_charges))throw new Error(data?.error||"Publish verification failed.");
+    const returned=new Set(data.vehicle_types.map((item:any)=>normalizeVehicleName(item.name)));
+    missing=expectedVehicles.filter(item=>!returned.has(normalizeVehicleName(item.name))).map(item=>item.name);
+    if(!missing.length)break;
+    if(attempt<2)await new Promise(resolve=>setTimeout(resolve,700*(attempt+1)));
+   }
+   if(missing.length)throw new Error(`Public API is missing: ${missing.join(", ")}. The fleet was saved, but the public endpoint has not updated yet.`);
    setPublishState("success");setMessage(`Published ${data.vehicle_types.length} vehicles, ${data.rate_cards.length} rate rows and ${data.additional_charges.length} additional charges.`);
   }catch(error){setPublishState("error");setMessage(error instanceof Error?error.message:"Unable to publish limousine data.")}
  };

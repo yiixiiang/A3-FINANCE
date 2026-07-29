@@ -45,10 +45,14 @@ export async function resumeCloudSession(){try{await verifyCloudConnection();awa
 
 export async function uploadStorageKeysToCloud(keys:string[]){
  const records=keys.filter(syncable).map(storage_key=>{const raw=localStorage.getItem(storage_key);let value:unknown=raw;try{value=JSON.parse(raw||"null")}catch{}return {storage_key,value}});
- if(!records.length)return verifyCloudConnection();
- // Send one storage record at a time so Vercel never receives one oversized combined request.
- for(const record of records)await api("push",{records:[record]});
- stamp();emit("connected");return verifyCloudConnection();
+ if(!records.length){stamp();emit("connected");return {ok:true,uploaded:0}}
+ emit("syncing");
+ // Use one request for normal-sized publishes. Large photo payloads are split only
+ // when necessary, avoiding the previous push + diagnostics round trips.
+ const bytes=new Blob([JSON.stringify(records)]).size;
+ if(bytes<3_000_000)await api("push",{records});
+ else for(const record of records)await api("push",{records:[record]});
+ stamp();emit("connected");return {ok:true,uploaded:records.length}
 }
 export async function uploadAllLocalDataToCloud(){emit("syncing");await api("push",{records:localRecords()});stamp();emit("connected");return verifyCloudConnection()}
 export async function restoreAllCloudDataToLocal(){emit("syncing");const p=await api("pull");applyCloudRecords(p.records||[]);stamp();emit("connected");return verifyCloudConnection()}

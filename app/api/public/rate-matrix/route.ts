@@ -70,34 +70,73 @@ export async function GET() {
           displayOrder: index + 1,
         }));
 
-    const activeFleet = fleet
+    const allActiveFleet = fleet
       .filter((item) => String(item.status || "Active").toLowerCase() !== "inactive")
       .sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
 
-    // Fleet & Photos is allowed to contain a newly added active vehicle before a
-    // matching rate column has been created. Publish every active fleet vehicle,
-    // while preserving the Vehicle Rates order for vehicles that already have rates.
-    const names = [...rateNames];
-    const knownNames = new Set(rateNames.map((name) => name.toLowerCase()));
-    for (const item of activeFleet) {
-      const name = String(item.name || "").trim();
-      if (name && !knownNames.has(name.toLowerCase())) {
-        names.push(name);
-        knownNames.add(name.toLowerCase());
-      }
+    const normal = (value: unknown) => String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const modernNames = new Set(["5 seater", "7 seater", "5 seater premium", "7 seater premium"]);
+    const legacyNames = new Set(["4 seater sedan", "6 seater mpv", "7 seater maxi cab", "alphard vellfire"]);
+    const hasModernFleet = allActiveFleet.some((item) => modernNames.has(normal(item.name)));
+
+    // When the new fleet naming set exists, suppress the old legacy aliases.
+    // This prevents the live website from rendering two price columns for the
+    // same class of vehicle after a fleet-name migration.
+    const filteredFleet = hasModernFleet
+      ? allActiveFleet.filter((item) => !legacyNames.has(normal(item.name)))
+      : allActiveFleet;
+
+    const activeFleet: any[] = [];
+    const seenFleetNames = new Set<string>();
+    for (const item of filteredFleet) {
+      const key = normal(item.name);
+      if (!key || seenFleetNames.has(key)) continue;
+      seenFleetNames.add(key);
+      activeFleet.push(item);
     }
 
-    const vehicleTypes = names.map((name, index) => {
-      const detail = activeFleet.find((item) => String(item.name || "").trim().toLowerCase() === name.trim().toLowerCase()) || activeFleet[index] || {};
-      return {
-        id: index + 1,
-        name,
-        passenger_capacity: Number(detail.passengerCapacity || 0) || null,
-        luggage_capacity: Number(detail.luggageCapacity || 0) || null,
-        description: String(detail.description || ""),
-        image_url: String(detail.imageUrl || ""),
-      };
-    });
+    // Fleet & Vehicle Photos is the single source of truth for public names.
+    const publicFleet = activeFleet.length
+      ? activeFleet
+      : rateNames.map((name, index) => ({
+          id: `VEH-${index + 1}`,
+          name,
+          passengerCapacity: Number(name.match(/\d+/)?.[0] || 0),
+          luggageCapacity: 0,
+          description: "Premium chauffeur vehicle",
+          imageUrl: "",
+          status: "Active",
+          displayOrder: index + 1,
+        }));
+
+    const names = publicFleet.map((item) => String(item.name || "").trim()).filter(Boolean);
+    const vehicleTypes = publicFleet.map((detail, index) => ({
+      id: index + 1,
+      name: String(detail.name || "").trim(),
+      passenger_capacity: Number(detail.passengerCapacity || 0) || null,
+      luggage_capacity: Number(detail.luggageCapacity || 0) || null,
+      description: String(detail.description || ""),
+      image_url: String(detail.imageUrl || ""),
+    }));
+
+    const rateAliases: Record<string, string[]> = {
+      "5 seater": ["5 seater", "4 seater sedan"],
+      "7 seater": ["7 seater", "6 seater mpv"],
+      "5 seater premium": ["5 seater premium", "7 seater maxi cab"],
+      "7 seater premium": ["7 seater premium", "alphard vellfire"],
+      "13 seater": ["13 seater", "13 seater minibus"],
+      "23 seater": ["23 seater", "23 seater mini coach"],
+      "45 seater": ["45 seater", "45 seater coach"],
+    };
+    const findRateIndex = (vehicleName: string, publicIndex: number) => {
+      const key = normal(vehicleName);
+      const candidates = rateAliases[key] || [key];
+      for (const candidate of candidates) {
+        const found = rateNames.findIndex((name) => normal(name) === candidate);
+        if (found >= 0) return found;
+      }
+      return publicIndex < rateNames.length ? publicIndex : -1;
+    };
 
     const rawRules = values[keys[1]];
     const rules: any[] = Array.isArray(rawRules) ? (rawRules as any[]) : DEFAULT_RATES;
@@ -105,7 +144,7 @@ export async function GET() {
       .filter((rule) => rule.status !== "Inactive")
       .flatMap((rule) =>
         names.map((vehicleName, index) => {
-          const rateIndex = rateNames.findIndex((name) => name.toLowerCase() === vehicleName.toLowerCase());
+          const rateIndex = findRateIndex(vehicleName, index);
           return {
           id: `${serviceType(String(rule.service || "service"))}-${index + 1}`,
           vehicle_type_id: index + 1,

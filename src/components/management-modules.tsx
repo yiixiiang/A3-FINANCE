@@ -55,7 +55,7 @@ function UnifiedLimousineWorkspace(){
    saveNow("a3-rate-management-vehicle-rules-v1",synced.rules);
    await uploadStorageKeysToCloud([FLEET_STORAGE_KEY,"a3-rate-management-vehicles-v1","a3-rate-management-vehicle-rules-v1",CHARGES_STORAGE_KEY]);
    const normalizeVehicleName=(value:unknown)=>String(value||"").trim().toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
-   const expectedVehicles=load<FleetVehicle[]>(FLEET_STORAGE_KEY,fleetDefaults).filter(item=>item.status==="Active");
+   const expectedVehicles=load<FleetVehicle[]>(FLEET_STORAGE_KEY,fleetDefaults).filter(item=>item.status==="Active"&&!isRemovedPublicVehicle(item.name));
    let data:any={};let missing:string[]=[];
    for(let attempt=0;attempt<3;attempt++){
     const response=await fetch(`/api/public/rate-matrix?t=${Date.now()}-${attempt}`,{cache:"no-store"});
@@ -113,13 +113,14 @@ function activeJobPayoutTier(value?:string){
 }
 function findJobPayoutRate(value?:string){return Number(activeJobPayoutTier(value)?.amount||0)}
 function jobPayoutTierLabel(value?:string){const tier=activeJobPayoutTier(value);return tier?`${tier.minPax}-${tier.maxPax} pax · ${money2(tier.amount)}`:"No matching job payout tier"}
-const rateVehicleDefaults=["4 Seater Sedan","6 Seater MPV","7 Seater Maxi Cab","Alphard / Vellfire","13 Seater Minibus","23 Seater Mini Coach","45 Seater Coach"];
+const rateVehicleDefaults=["4 Seater Sedan","6 Seater MPV","7 Seater Maxi Cab","Alphard / Vellfire","13 Seater Minibus"];
+const isRemovedPublicVehicle=(value:unknown)=>/\b(?:23|45)\s*seater\b/i.test(String(value||""));
 const vehicleRateDefaults:ManagedRateRule[]=[
- {service:"Point to Point",tripType:"Per Trip",values:["45","50","55","65","75","120","160"],status:"Active"},
- {service:"Airport Arrival",tripType:"Per Trip",values:["50","55","60","70","80","130","170"],status:"Active"},
- {service:"Airport Departure",tripType:"Per Trip",values:["50","55","60","70","80","130","170"],status:"Active"},
- {service:"Hourly Disposal (minimum 3 hours)",tripType:"Per Hour",values:["45","50","55","65","70","110","140"],status:"Active"},
- {service:"Cross Border SG to JB (from)",tripType:"Per Trip",values:["120","130","140","170","210","300","420"],status:"Active"}
+ {service:"Point to Point",tripType:"Per Trip",values:["45","50","55","65","75"],status:"Active"},
+ {service:"Airport Arrival",tripType:"Per Trip",values:["50","55","60","70","80"],status:"Active"},
+ {service:"Airport Departure",tripType:"Per Trip",values:["50","55","60","70","80"],status:"Active"},
+ {service:"Hourly Disposal (minimum 3 hours)",tripType:"Per Hour",values:["45","50","55","65","70"],status:"Active"},
+ {service:"Cross Border SG to JB (from)",tripType:"Per Trip",values:["120","130","140","170","210"],status:"Active"}
 ];
 const driverRateDefaults:ManagedRateRule[]=[
  {service:"Airport Arrival",tripType:"Per Trip",values:["40","45","65","70","85","120"],status:"Active"},
@@ -169,7 +170,7 @@ function synchronizeRateVehiclesWithFleet(fleetInput?:FleetVehicle[]){
  const vehicleKey="a3-rate-management-vehicles-v1";
  const rulesKey="a3-rate-management-vehicle-rules-v1";
  const normal=(value:string)=>String(value||"").trim().toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
- const fleet=(fleetInput||load<FleetVehicle[]>("a3-limousine-fleet-v1",fleetDefaults)).filter(item=>item.status==="Active").sort((a,b)=>Number(a.displayOrder||0)-Number(b.displayOrder||0));
+ const fleet=(fleetInput||load<FleetVehicle[]>("a3-limousine-fleet-v1",fleetDefaults)).filter(item=>item.status==="Active"&&!isRemovedPublicVehicle(item.name)).sort((a,b)=>Number(a.displayOrder||0)-Number(b.displayOrder||0));
  const names:string[]=[]; const seen=new Set<string>();
  for(const item of fleet){const name=item.name.trim();const key=normal(name);if(name&&!seen.has(key)){seen.add(key);names.push(name)}}
  const oldVehicles=load<string[]>(vehicleKey,rateVehicleDefaults);
@@ -180,8 +181,6 @@ function synchronizeRateVehiclesWithFleet(fleetInput?:FleetVehicle[]){
   "5 seater premium":["5 seater premium","7 seater maxi cab"],
   "7 seater premium":["7 seater premium","alphard vellfire"],
   "13 seater":["13 seater","13 seater minibus"],
-  "23 seater":["23 seater","23 seater mini coach"],
-  "45 seater":["45 seater","45 seater coach"],
  };
  const indexFor=(name:string,index:number)=>{const choices=aliases[normal(name)]||[normal(name)];for(const choice of choices){const found=oldVehicles.findIndex(item=>normal(item)===choice);if(found>=0)return found}return index<oldVehicles.length?index:-1};
  const nextVehicles=names.length?names:oldVehicles.filter((name,index,rows)=>rows.findIndex(item=>normal(item)===normal(name))===index);
@@ -241,13 +240,13 @@ const chargeDefaults:AdditionalCharge[]=[
  {id:"CHG-011",code:"ERP_PARKING",name:"ERP, tolls and parking",chargeType:"Actual Cost",amount:0,description:"Charged at actual cost where applicable.",status:"Active",displayOrder:11}
 ];
 function FleetManagement(){
- const [vehicles,setVehicles]=useState<FleetVehicle[]>(()=>load(FLEET_STORAGE_KEY,fleetDefaults));
+ const [vehicles,setVehicles]=useState<FleetVehicle[]>(()=>load<FleetVehicle[]>(FLEET_STORAGE_KEY,fleetDefaults).filter(item=>!isRemovedPublicVehicle(item.name)));
  const [editing,setEditing]=useState<FleetVehicle|null>(null);
  const [publishState,setPublishState]=useState<""|"saving"|"publishing"|"success"|"error">("");
  const [message,setMessage]=useState("");
- useEffect(()=>save(FLEET_STORAGE_KEY,vehicles),[vehicles]);
- const normalizedVehicles=()=>vehicles.map((vehicle,index)=>({...vehicle,name:vehicle.name.trim(),passengerCapacity:Math.max(0,Number(vehicle.passengerCapacity||0)),luggageCapacity:Math.max(0,Number(vehicle.luggageCapacity||0)),displayOrder:Math.max(1,Number(vehicle.displayOrder||index+1))}));
- const commit=()=>{if(!editing?.name.trim())return false;const clean={...editing,name:editing.name.trim(),passengerCapacity:Math.max(0,Number(editing.passengerCapacity||0)),luggageCapacity:Math.max(0,Number(editing.luggageCapacity||0)),displayOrder:Math.max(1,Number(editing.displayOrder||1))};setVehicles(rows=>rows.some(row=>row.id===clean.id)?rows.map(row=>row.id===clean.id?clean:row):[...rows,{...clean,id:`VEH-${Date.now()}`}]);setEditing(null);setMessage("Vehicle changes ready. Select Save draft, then use Publish All above.");return true};
+ useEffect(()=>save(FLEET_STORAGE_KEY,vehicles.filter(item=>!isRemovedPublicVehicle(item.name))),[vehicles]);
+ const normalizedVehicles=()=>vehicles.filter(vehicle=>!isRemovedPublicVehicle(vehicle.name)).map((vehicle,index)=>({...vehicle,name:vehicle.name.trim(),passengerCapacity:Math.max(0,Number(vehicle.passengerCapacity||0)),luggageCapacity:Math.max(0,Number(vehicle.luggageCapacity||0)),displayOrder:Math.max(1,Number(vehicle.displayOrder||index+1))}));
+ const commit=()=>{if(!editing?.name.trim())return false;if(isRemovedPublicVehicle(editing.name)){setMessage("23 Seater and 45 Seater have been removed from the public fleet and cannot be added.");return false;}const clean={...editing,name:editing.name.trim(),passengerCapacity:Math.max(0,Number(editing.passengerCapacity||0)),luggageCapacity:Math.max(0,Number(editing.luggageCapacity||0)),displayOrder:Math.max(1,Number(editing.displayOrder||1))};setVehicles(rows=>rows.some(row=>row.id===clean.id)?rows.map(row=>row.id===clean.id?clean:row):[...rows,{...clean,id:`VEH-${Date.now()}`}]);setEditing(null);setMessage("Vehicle changes ready. Select Save draft, then use Publish All above.");return true};
  const upload=(file?:File)=>{if(!file||!editing)return;if(!file.type.startsWith("image/")){setMessage("Please select an image file.");return}const reader=new FileReader();reader.onload=()=>{const image=new Image();image.onload=()=>{const max=1280;const scale=Math.min(1,max/Math.max(image.width,image.height));const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));const ctx=canvas.getContext("2d");if(!ctx){setMessage("Unable to process this image.");return}ctx.drawImage(image,0,0,canvas.width,canvas.height);const imageUrl=canvas.toDataURL("image/jpeg",0.78);setEditing(current=>current?{...current,imageUrl}:current);setMessage("Photo optimised for the live website. Save the vehicle, then publish.")};image.onerror=()=>setMessage("Unable to read this image.");image.src=String(reader.result||"")};reader.readAsDataURL(file)};
  const saveFleet=()=>{const next=normalizedVehicles();setVehicles(next);saveNow(FLEET_STORAGE_KEY,next);synchronizeRateVehiclesWithFleet(next);setPublishState("saving");setMessage("Fleet, vehicle names and rate columns saved as one synchronized draft.");window.setTimeout(()=>setPublishState(""),900)};
  const removeVehicle=(vehicle:FleetVehicle)=>{if(!window.confirm(`Delete ${vehicle.name} from Fleet & Photos?`))return;setVehicles(rows=>rows.filter(row=>row.id!==vehicle.id));setMessage("Vehicle removed. Publish again to remove it from the live website.")};

@@ -3,13 +3,14 @@ import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_VEHICLES = ["4 Seater Sedan", "6 Seater MPV", "7 Seater Maxi Cab", "Alphard / Vellfire", "13 Seater Minibus", "23 Seater Mini Coach", "45 Seater Coach"];
+const DEFAULT_VEHICLES = ["4 Seater Sedan", "6 Seater MPV", "7 Seater Maxi Cab", "Alphard / Vellfire", "13 Seater Minibus"];
+const isRemovedPublicVehicle = (value: unknown) => /\b(?:23|45)\s*seater\b/i.test(String(value || ""));
 const DEFAULT_RATES = [
-  { service: "Airport Arrival", tripType: "Per Trip", values: ["70", "80", "80", "90", "90", "170"], status: "Active" },
-  { service: "Airport Departure", tripType: "Per Trip", values: ["65", "75", "75", "80", "85", "160"], status: "Active" },
-  { service: "Point to Point", tripType: "Per Trip", values: ["60", "70", "70", "75", "80", "150"], status: "Active" },
-  { service: "Hourly Disposal (minimum 3 hours)", tripType: "Per Hour", values: ["55", "65", "65", "75", "70", "120"], status: "Active" },
-  { service: "Cross Border SG to JB (from)", tripType: "Per Trip", values: ["220", "250", "280", "320", "380", "480"], status: "Active" },
+  { service: "Airport Arrival", tripType: "Per Trip", values: ["70", "80", "80", "90", "90"], status: "Active" },
+  { service: "Airport Departure", tripType: "Per Trip", values: ["65", "75", "75", "80", "85"], status: "Active" },
+  { service: "Point to Point", tripType: "Per Trip", values: ["60", "70", "70", "75", "80"], status: "Active" },
+  { service: "Hourly Disposal (minimum 3 hours)", tripType: "Per Hour", values: ["55", "65", "65", "75", "70"], status: "Active" },
+  { service: "Cross Border SG to JB (from)", tripType: "Per Trip", values: ["220", "250", "280", "320", "380"], status: "Active" },
 ];
 
 const serviceType = (value: string) =>
@@ -54,7 +55,7 @@ export async function GET() {
     }
 
     const rawNames = values[keys[0]];
-    const rateNames: string[] = Array.isArray(rawNames) ? rawNames.map((value: unknown) => String(value).trim()).filter(Boolean) : DEFAULT_VEHICLES;
+    const rateNames: string[] = Array.isArray(rawNames) ? rawNames.map((value: unknown) => String(value).trim()).filter((name) => Boolean(name) && !isRemovedPublicVehicle(name)) : DEFAULT_VEHICLES;
 
     const rawFleet = values[keys[2]];
     const fleet: any[] = Array.isArray(rawFleet)
@@ -71,7 +72,7 @@ export async function GET() {
         }));
 
     const allActiveFleet = fleet
-      .filter((item) => String(item.status || "Active").toLowerCase() !== "inactive")
+      .filter((item) => String(item.status || "Active").toLowerCase() !== "inactive" && !isRemovedPublicVehicle(item.name))
       .sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
 
     const normal = (value: unknown) => String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -118,8 +119,6 @@ export async function GET() {
       "5 seater premium": ["5 seater premium", "7 seater maxi cab"],
       "7 seater premium": ["7 seater premium", "alphard vellfire"],
       "13 seater": ["13 seater", "13 seater minibus"],
-      "23 seater": ["23 seater", "23 seater mini coach"],
-      "45 seater": ["45 seater", "45 seater coach"],
     };
     const findRateIndex = (vehicleName: string, publicIndex: number) => {
       const key = normal(vehicleName);

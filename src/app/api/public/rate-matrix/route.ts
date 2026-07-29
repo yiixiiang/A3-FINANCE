@@ -19,13 +19,14 @@ type StorageRow = {
   updated_at?: string | null;
 };
 
+const isRemovedPublicVehicle = (value: unknown) => /\b(?:23|45)\s*seater\b/i.test(String(value || ""));
+
 const defaultVehicles = [
   "5 Seater",
   "7 Seater",
   "5 Seater Premium",
   "7 Seater Premium",
   "13 Seater",
-  "23 Seater",
 ];
 
 const defaultRules: ManagedRateRule[] = [
@@ -106,7 +107,7 @@ export async function GET() {
       const rulesRow = latestValue(rows, RULES_KEY);
 
       if (Array.isArray(vehicleRow?.value) && vehicleRow!.value.length) {
-        vehicles = vehicleRow!.value.map(String);
+        vehicles = vehicleRow!.value.map(String).filter((name) => !isRemovedPublicVehicle(name));
       }
       if (Array.isArray(rulesRow?.value) && rulesRow!.value.length) {
         rules = (rulesRow!.value as ManagedRateRule[]).filter(
@@ -124,6 +125,8 @@ export async function GET() {
   } catch (error) {
     console.error("Rate matrix API:", error);
   }
+
+  vehicles = vehicles.filter((name) => !isRemovedPublicVehicle(name));
 
   const vehicle_types = vehicles.map((name, index) => ({
     id: index + 1,

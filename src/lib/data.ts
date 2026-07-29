@@ -1,5 +1,5 @@
 export type Role = "ADMIN" | "OPERATIONS" | "DRIVER";
-export const vehicleTypes = ["5 Seater","7 Seater","5 Seater Premium","7 Seater Premium","13 Seater","23 Seater"];
+export const vehicleTypes = ["5 Seater","7 Seater","5 Seater Premium","7 Seater Premium","13 Seater"];
 export const services = [
   ["Airport Arrival","Per Trip"],["Airport Departure","Per Trip"],["Point to Point","Per Trip"],["Hourly Disposal","Per Hour"],
   ["Cross Border SG to JB","Per Trip"],["Midnight Charges 23:00 - 06:30","Per Trip"],["Childseat 1-7 Year Old","Per Trip"],["Singapore Postal Code Start 60-80","Per Trip"]
@@ -18,5 +18,5 @@ export const bookings = [
   ["A3L-260725-018","Nicole Tan","25 Jul · 14:30","Airport Arrival","7 Seater Premium","Confirmed","S$150"],
   ["A3L-260725-017","Daniel Koh","25 Jul · 16:15","Point to Point","5 Seater","Driver assigned","S$55"],
   ["A3L-260725-016","Mei Lin","25 Jul · 23:40","Airport Departure","7 Seater","Pending","S$90"],
-  ["A3L-260725-015","Horizon Events","26 Jul · 09:00","Hourly Disposal","23 Seater","Confirmed","S$880"]
+  ["A3L-260725-015","Horizon Events","26 Jul · 09:00","Hourly Disposal","Confirmed","S$880"]
 ];

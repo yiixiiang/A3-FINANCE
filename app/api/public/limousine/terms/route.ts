@@ -1,0 +1,7 @@
+import {NextResponse} from "next/server";
+import {createClient} from "@supabase/supabase-js";
+export const dynamic="force-dynamic";
+const STORAGE_KEY="a3-limousine-terms-public-v1";
+const fallback={title:"Terms & Conditions",intro:"These terms apply to A3 Group SG limousine bookings.",version:"2026-07-29",lastUpdated:"2026-07-29",checkboxText:"I agree to the Terms & Conditions.",content:"Online bookings must be submitted more than 6 hours before the scheduled pickup time. A booking made exactly 6 hours before pickup is not accepted."};
+function client(){const url=process.env.NEXT_PUBLIC_SUPABASE_URL||process.env.SUPABASE_URL||"";const key=process.env.SUPABASE_SERVICE_ROLE_KEY||process.env.SUPABASE_SECRET_KEY||"";if(!url||!key)throw new Error("Finance cloud is not configured.");return createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}})}
+export async function GET(){try{const s=client();const {data,error}=await s.from("a3_app_storage").select("value,updated_at").eq("storage_key",STORAGE_KEY).order("updated_at",{ascending:false}).limit(1).maybeSingle();if(error)throw error;return NextResponse.json({ok:true,terms:data?.value||fallback,updated_at:data?.updated_at||null},{headers:{"Cache-Control":"no-store","Access-Control-Allow-Origin":"*"}})}catch{return NextResponse.json({ok:true,terms:fallback},{headers:{"Cache-Control":"no-store","Access-Control-Allow-Origin":"*"}})}}

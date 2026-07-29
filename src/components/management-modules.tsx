@@ -45,7 +45,23 @@ function RateManagement(){
 }
 
 function UnifiedLimousineWorkspace(){
+ const [publishState,setPublishState]=useState<""|"publishing"|"success"|"error">("");
+ const [message,setMessage]=useState("");
+ const publishAll=async()=>{
+  setPublishState("publishing");setMessage("");
+  try{
+   synchronizeRateVehiclesWithFleet();
+   await uploadStorageKeysToCloud([FLEET_STORAGE_KEY,"a3-rate-management-vehicles-v1","a3-rate-management-vehicle-rules-v1",CHARGES_STORAGE_KEY]);
+   const response=await fetch(`/api/public/rate-matrix?t=${Date.now()}`,{cache:"no-store"});
+   const text=await response.text();
+   let data:any={};try{data=text?JSON.parse(text):{}}catch{throw new Error(`Public API returned an invalid response (${response.status}).`)}
+   if(!response.ok||!Array.isArray(data.vehicle_types)||!Array.isArray(data.rate_cards)||!Array.isArray(data.additional_charges))throw new Error(data?.error||"Publish verification failed.");
+   setPublishState("success");setMessage(`Published ${data.vehicle_types.length} vehicles, ${data.rate_cards.length} rate rows and ${data.additional_charges.length} additional charges.`);
+  }catch(error){setPublishState("error");setMessage(error instanceof Error?error.message:"Unable to publish limousine data.")}
+ };
  return <div className="limousine-unified">
+  <div className="rateactions limousine-publish-all"><span>Save and publish fleet, photos, vehicle rates and additional charges together.</span><button className="primary" disabled={publishState==="publishing"} onClick={()=>void publishAll()}><Send size={17}/>{publishState==="publishing"?"Publishing everything…":"Publish All to Limousine Website"}</button></div>
+  {message&&<div className={`publishnotice ${publishState==="error"?"error":""}`}>{publishState==="error"?<X size={17}/>:<CheckCircle2 size={17}/>} {message}</div>}
   <div className="limousine-overview">
    <div><strong>1. Fleet & Photos</strong><span>Create or rename vehicles, set capacity and upload the public photo.</span></div>
    <div><strong>2. Vehicle Rates</strong><span>Enter service prices using the exact same fleet vehicle names.</span></div>
